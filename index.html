@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7FA889">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ぽんず時間ログ">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>ぽんず時間ログ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #EEF1EA;
+  --panel: #fff;
+  --ink: #30322D;
+  --muted: #888B7E;
+  --soft: #F7F6EF;
+  --line: #E0DDD2;
+  --sage: #7FA889;     --sage-s: #E4EFE3;
+  --coral: #EFA888;    --coral-s: #FBE9E0;
+  --sky: #8FBED4;      --sky-s: #E4F0F4;
+  --lavender: #B6A4D6; --lavender-s: #EFE8F8;
+  --amber: #E5B65C;    --amber-s: #FBF1DC;
+  --rose: #DD9A9A;     --rose-s: #FBEAE9;
+  --shadow: 0 4px 18px rgba(48,50,45,.08);
+  --shadow-sm: 0 2px 8px rgba(48,50,45,.05);
+  --radius: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { color-scheme: light; }
+body {
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', sans-serif;
+  background: linear-gradient(165deg, #F5F7F0 0%, var(--bg) 60%, #E8EDE4 100%);
+  color: var(--ink);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.app { width: min(100%, 520px); margin: 0 auto; padding: 20px 16px calc(80px + env(safe-area-inset-bottom)); }
+
+/* Header */
+.header { margin-bottom: 20px; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .18em; color: var(--muted); font-family: 'Zen Maru Gothic', sans-serif; margin-bottom: 4px; }
+h1 { font-size: 24px; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 900; }
+.today-total { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.today-total span { color: var(--sage); font-weight: 700; }
+
+/* Timer Card */
+.timer-card {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.timer-idle { text-align: center; }
+.timer-idle p { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+.cat-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+.cat-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px;
+  border: 2px solid var(--line);
+  background: var(--soft);
+  font-size: 14px; cursor: pointer;
+  transition: all .15s;
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+}
+.cat-chip:active, .cat-chip.selected {
+  border-color: var(--accent, var(--sage));
+  background: var(--accent-s, var(--sage-s));
+}
+.cat-chip .emoji { font-size: 18px; }
+
+/* Active timer */
+.timer-active { text-align: center; }
+.timer-cat-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--sage-s); color: var(--sage);
+  border-radius: 999px; padding: 6px 16px;
+  font-weight: 700; font-size: 14px; margin-bottom: 16px;
+}
+.timer-display {
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: 52px; font-weight: 900;
+  letter-spacing: .04em; color: var(--ink);
+  margin-bottom: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.stop-btn {
+  background: var(--coral); color: #fff;
+  border: none; border-radius: 999px;
+  padding: 12px 32px; font-size: 16px; font-weight: 700;
+  cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif;
+  transition: opacity .15s;
+}
+.stop-btn:active { opacity: .8; }
+
+/* Section */
+.section-title {
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: 13px; font-weight: 700;
+  color: var(--muted); letter-spacing: .1em;
+  margin: 20px 0 10px;
+}
+
+/* Log bars */
+.log-bars { display: flex; flex-direction: column; gap: 8px; }
+.log-bar-row { background: var(--panel); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-sm); }
+.log-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.log-bar-label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
+.log-bar-time { font-size: 13px; color: var(--muted); font-weight: 700; }
+.log-bar-track { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.log-bar-fill { height: 100%; border-radius: 999px; background: var(--accent, var(--sage)); transition: width .4s ease; }
+
+/* Sessions list */
+.sessions-list { display: flex; flex-direction: column; gap: 6px; }
+.session-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border-radius: 10px; padding: 10px 14px;
+  box-shadow: var(--shadow-sm); font-size: 13px;
+}
+.session-emoji { font-size: 16px; }
+.session-name { flex: 1; font-weight: 500; }
+.session-time { color: var(--muted); }
+.session-duration { font-weight: 700; color: var(--ink); min-width: 48px; text-align: right; }
+.session-del { color: var(--muted); background: none; border: none; cursor: pointer; font-size: 16px; padding: 0 0 0 4px; }
+
+/* Export box */
+.export-box { background: var(--panel); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); }
+.export-text { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 12px; font-family: monospace; background: var(--soft); color: var(--ink); resize: none; min-height: 100px; }
+.copy-btn {
+  width: 100%; margin-top: 10px;
+  background: var(--sage); color: #fff;
+  border: none; border-radius: 999px;
+  padding: 11px; font-size: 15px; font-weight: 700;
+  cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif;
+  transition: opacity .15s;
+}
+.copy-btn:active { opacity: .8; }
+.copy-btn.copied { background: var(--amber); }
+
+/* Category manager */
+.cat-manager { display: flex; flex-direction: column; gap: 8px; }
+.cat-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border-radius: 12px; padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+}
+.cat-item-emoji { font-size: 20px; }
+.cat-item-name { flex: 1; font-weight: 500; }
+.cat-item-del { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); }
+.add-cat-form { display: flex; gap: 8px; margin-top: 8px; }
+.add-cat-emoji { width: 44px; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; font-size: 18px; font-family: inherit; background: var(--soft); }
+.add-cat-name { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-family: inherit; background: var(--soft); color: var(--ink); }
+.add-cat-btn { background: var(--sage); color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif; }
+
+/* Empty state */
+.empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0; }
+
+/* Tab nav */
+.tab-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: min(100%, 520px);
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  display: flex;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-btn {
+  flex: 1; border: none; background: none;
+  padding: 10px 0; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+  font-size: 10px; color: var(--muted);
+  transition: color .15s;
+}
+.tab-btn.active { color: var(--sage); }
+.tab-btn svg { width: 22px; height: 22px; }
+
+/* Period selector */
+.period-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.period-btn {
+  padding: 5px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--soft); font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: 'Zen Kaku Gothic New', sans-serif; color: var(--muted);
+  transition: all .15s;
+}
+.period-btn.active { background: var(--sage); color: #fff; border-color: var(--sage); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--ink); color: #fff; border-radius: 999px;
+  padding: 10px 20px; font-size: 13px; font-weight: 700;
+  opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 100;
+  font-family: 'Zen Maru Gothic', sans-serif;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="header">
+    <div class="eyebrow">PONZU TIME LOG</div>
+    <h1>ぽんず時間ログ</h1>
+    <div class="today-total">今日の合計：<span id="today-total">0分</span></div>
+  </div>
+  <div id="tab-home"></div>
+  <div id="tab-history" style="display:none"></div>
+  <div id="tab-settings" style="display:none"></div>
+</div>
+
+<nav class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('home')" id="nav-home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    ホーム
+  </button>
+  <button class="tab-btn" onclick="switchTab('history')" id="nav-history">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    記録
+  </button>
+  <button class="tab-btn" onclick="switchTab('settings')" id="nav-settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    設定
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────
+const COLORS = [
+  { name: 'sage',     val: 'var(--sage)',     soft: 'var(--sage-s)' },
+  { name: 'coral',    val: 'var(--coral)',    soft: 'var(--coral-s)' },
+  { name: 'sky',      val: 'var(--sky)',      soft: 'var(--sky-s)' },
+  { name: 'lavender', val: 'var(--lavender)', soft: 'var(--lavender-s)' },
+  { name: 'amber',    val: 'var(--amber)',    soft: 'var(--amber-s)' },
+  { name: 'rose',     val: 'var(--rose)',     soft: 'var(--rose-s)' },
+];
+
+function loadCats() {
+  try { return JSON.parse(localStorage.getItem('timelog_categories_v1')) || defaultCats(); }
+  catch { return defaultCats(); }
+}
+function saveCats(c) { localStorage.setItem('timelog_categories_v1', JSON.stringify(c)); }
+function defaultCats() {
+  return [
+    { id: '1', name: 'ぽんずアプリ開発', emoji: '🍊', color: 0 },
+    { id: '2', name: 'ノア開発', emoji: '🌿', color: 1 },
+    { id: '3', name: 'インプット', emoji: '📚', color: 2 },
+    { id: '4', name: '仕事', emoji: '💼', color: 3 },
+    { id: '5', name: '休憩', emoji: '☕', color: 4 },
+  ];
+}
+
+function loadSessions() {
+  try { return JSON.parse(localStorage.getItem('timelog_sessions_v1')) || []; }
+  catch { return []; }
+}
+function saveSessions(s) { localStorage.setItem('timelog_sessions_v1', JSON.stringify(s)); }
+
+function loadActive() {
+  try { return JSON.parse(localStorage.getItem('timelog_active_v1')) || null; }
+  catch { return null; }
+}
+function saveActive(a) {
+  if (a) localStorage.setItem('timelog_active_v1', JSON.stringify(a));
+  else localStorage.removeItem('timelog_active_v1');
+}
+
+// ── State ─────────────────────────────────────────────────────────
+let cats = loadCats();
+let sessions = loadSessions();
+let active = loadActive();
+let timerInterval = null;
+let currentTab = 'home';
+let historyPeriod = 'today';
+
+// ── Utils ─────────────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function fmtDuration(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h${String(m % 60).padStart(2,'0')}m`;
+  return `${m}m`;
+}
+
+function fmtTimer(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  return `${String(h).padStart(2,'0')}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function todayStr() { return new Date().toLocaleDateString('ja-JP'); }
+
+function isToday(iso) {
+  return new Date(iso).toLocaleDateString('ja-JP') === todayStr();
+}
+
+function isThisWeek(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now - d;
+  return diff >= 0 && diff < 7 * 24 * 60 * 60 * 1000;
+}
+
+function getCat(id) { return cats.find(c => c.id === id) || { name: '不明', emoji: '❓', color: 0 }; }
+
+function getColor(idx) { return COLORS[idx % COLORS.length]; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Summaries ─────────────────────────────────────────────────────
+function summarize(filterFn) {
+  const totals = {};
+  sessions.filter(s => filterFn(s.startedAt)).forEach(s => {
+    totals[s.categoryId] = (totals[s.categoryId] || 0) + s.duration;
+  });
+  return totals;
+}
+
+function totalMs(filterFn) {
+  return sessions.filter(s => filterFn(s.startedAt)).reduce((sum, s) => sum + s.duration, 0);
+}
+
+function updateTodayTotal() {
+  const ms = totalMs(isToday) + (active ? Date.now() - new Date(active.startedAt).getTime() : 0);
+  document.getElementById('today-total').textContent = ms < 60000 ? '0分' : fmtDuration(ms);
+}
+
+// ── Timer ─────────────────────────────────────────────────────────
+function startTimer(catId) {
+  active = { id: uid(), categoryId: catId, startedAt: new Date().toISOString() };
+  saveActive(active);
+  startTick();
+  renderHome();
+}
+
+function stopTimer() {
+  if (!active) return;
+  clearInterval(timerInterval);
+  const duration = Date.now() - new Date(active.startedAt).getTime();
+  if (duration > 3000) {
+    sessions.push({ id: active.id, categoryId: active.categoryId, startedAt: active.startedAt, endedAt: new Date().toISOString(), duration });
+    saveSessions(sessions);
+    showToast(`記録しました！ ${fmtDuration(duration)}`);
+  }
+  active = null;
+  saveActive(null);
+  renderHome();
+  if (currentTab === 'history') renderHistory();
+}
+
+function startTick() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (!active) return;
+    const el = document.getElementById('timer-display');
+    if (el) el.textContent = fmtTimer(Date.now() - new Date(active.startedAt).getTime());
+    updateTodayTotal();
+  }, 1000);
+}
+
+if (active) startTick();
+
+// ── Render: Home ──────────────────────────────────────────────────
+function renderHome() {
+  updateTodayTotal();
+  const el = document.getElementById('tab-home');
+
+  // Timer card
+  let timerHTML = '';
+  if (active) {
+    const cat = getCat(active.categoryId);
+    const color = getColor(cat.color);
+    const elapsed = Date.now() - new Date(active.startedAt).getTime();
+    timerHTML = `
+      <div class="timer-card">
+        <div class="timer-active">
+          <div class="timer-cat-label">${cat.emoji} ${cat.name}</div>
+          <div class="timer-display" id="timer-display">${fmtTimer(elapsed)}</div>
+          <button class="stop-btn" onclick="stopTimer()">■ 停止</button>
+        </div>
+      </div>`;
+  } else {
+    const chips = cats.map(c => {
+      const color = getColor(c.color);
+      return `<button class="cat-chip" style="--accent:${color.val};--accent-s:${color.soft}" onclick="startTimer('${c.id}')">
+        <span class="emoji">${c.emoji}</span>${c.name}
+      </button>`;
+    }).join('');
+    timerHTML = `
+      <div class="timer-card">
+        <div class="timer-idle">
+          <p>カテゴリを選んで計測を開始</p>
+          <div class="cat-grid">${chips}</div>
+        </div>
+      </div>`;
+  }
+
+  // Today's bars
+  const todayTotals = summarize(isToday);
+  const todayMs = totalMs(isToday) + (active ? Date.now() - new Date(active.startedAt).getTime() : 0);
+  const maxMs = Math.max(...Object.values(todayTotals), 1);
+
+  let barsHTML = '';
+  if (Object.keys(todayTotals).length === 0 && !active) {
+    barsHTML = '<div class="empty">今日の記録はまだありません</div>';
+  } else {
+    const rows = cats.filter(c => todayTotals[c.id]).map(c => {
+      const color = getColor(c.color);
+      const pct = Math.round((todayTotals[c.id] / maxMs) * 100);
+      return `<div class="log-bar-row">
+        <div class="log-bar-header">
+          <div class="log-bar-label">${c.emoji} ${c.name}</div>
+          <div class="log-bar-time">${fmtDuration(todayTotals[c.id])}</div>
+        </div>
+        <div class="log-bar-track"><div class="log-bar-fill" style="width:${pct}%;background:${color.val}"></div></div>
+      </div>`;
+    }).join('');
+    barsHTML = rows || '<div class="empty">計測を開始してください</div>';
+  }
+
+  el.innerHTML = timerHTML + `
+    <div class="section-title">今日の内訳</div>
+    <div class="log-bars">${barsHTML}</div>`;
+}
+
+// ── Render: History ───────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('tab-history');
+  const filterFn = historyPeriod === 'today' ? isToday : isThisWeek;
+  const label = historyPeriod === 'today' ? '今日' : '今週';
+
+  const filtered = [...sessions].filter(s => filterFn(s.startedAt)).reverse();
+  const totals = summarize(filterFn);
+  const totalMsVal = totalMs(filterFn);
+  const maxMs = Math.max(...Object.values(totals), 1);
+
+  const periodTabs = `<div class="period-tabs">
+    <button class="period-btn ${historyPeriod==='today'?'active':''}" onclick="setPeriod('today')">今日</button>
+    <button class="period-btn ${historyPeriod==='week'?'active':''}" onclick="setPeriod('week')">今週</button>
+  </div>`;
+
+  const bars = cats.filter(c => totals[c.id]).map(c => {
+    const color = getColor(c.color);
+    const pct = Math.round((totals[c.id] / maxMs) * 100);
+    return `<div class="log-bar-row">
+      <div class="log-bar-header">
+        <div class="log-bar-label">${c.emoji} ${c.name}</div>
+        <div class="log-bar-time">${fmtDuration(totals[c.id])}</div>
+      </div>
+      <div class="log-bar-track"><div class="log-bar-fill" style="width:${pct}%;background:${getColor(c.color).val}"></div></div>
+    </div>`;
+  }).join('') || '<div class="empty">記録がありません</div>';
+
+  const sessionItems = filtered.map(s => {
+    const cat = getCat(s.categoryId);
+    const color = getColor(cat.color);
+    return `<div class="session-item">
+      <span class="session-emoji">${cat.emoji}</span>
+      <span class="session-name">${cat.name}</span>
+      <span class="session-time">${fmtTime(s.startedAt)}</span>
+      <span class="session-duration">${fmtDuration(s.duration)}</span>
+      <button class="session-del" onclick="deleteSession('${s.id}')">×</button>
+    </div>`;
+  }).join('') || '<div class="empty">記録がありません</div>';
+
+  el.innerHTML = periodTabs + `
+    <div class="section-title">${label}の合計：${totalMsVal > 0 ? fmtDuration(totalMsVal) : '0分'}</div>
+    <div class="log-bars">${bars}</div>
+    <div class="section-title">${label}のセッション</div>
+    <div class="sessions-list">${sessionItems}</div>`;
+}
+
+function setPeriod(p) { historyPeriod = p; renderHistory(); }
+
+function deleteSession(id) {
+  sessions = sessions.filter(s => s.id !== id);
+  saveSessions(sessions);
+  renderHistory();
+  updateTodayTotal();
+}
+
+// ── Render: Settings ──────────────────────────────────────────────
+function renderSettings() {
+  const el = document.getElementById('tab-settings');
+
+  const catItems = cats.map(c => {
+    const color = getColor(c.color);
+    return `<div class="cat-item" style="border-left: 3px solid ${color.val}">
+      <span class="cat-item-emoji">${c.emoji}</span>
+      <span class="cat-item-name">${c.name}</span>
+      <button class="cat-item-del" onclick="deleteCat('${c.id}')">×</button>
+    </div>`;
+  }).join('');
+
+  // Export
+  const exportText = buildExportText();
+
+  el.innerHTML = `
+    <div class="section-title">カテゴリ管理</div>
+    <div class="cat-manager">
+      ${catItems}
+      <div class="add-cat-form">
+        <input class="add-cat-emoji" id="new-emoji" placeholder="🍀" maxlength="2">
+        <input class="add-cat-name" id="new-name" placeholder="カテゴリ名" maxlength="20">
+        <button class="add-cat-btn" onclick="addCat()">追加</button>
+      </div>
+    </div>
+
+    <div class="section-title">ノアへのエクスポート</div>
+    <div class="export-box">
+      <textarea class="export-text" id="export-text" readonly>${exportText}</textarea>
+      <button class="copy-btn" id="copy-btn" onclick="copyExport()">📋 コピーしてノアに渡す</button>
+    </div>`;
+}
+
+function buildExportText() {
+  const now = new Date();
+  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+  const todayTotals = summarize(isToday);
+  const weekTotals = summarize(isThisWeek);
+  const todayMs = totalMs(isToday);
+  const weekMs = totalMs(isThisWeek);
+
+  let lines = [`【ぽんず時間ログ】${fmt(now)}`,''];
+  lines.push('▼ 今日');
+  cats.filter(c => todayTotals[c.id]).forEach(c => {
+    lines.push(`  ${c.emoji} ${c.name}: ${fmtDuration(todayTotals[c.id])}`);
+  });
+  if (Object.keys(todayTotals).length === 0) lines.push('  記録なし');
+  lines.push(`  合計: ${todayMs > 0 ? fmtDuration(todayMs) : '0分'}`);
+  lines.push('');
+  lines.push(`▼ 今週（${fmt(weekAgo)}〜${fmt(now)}）`);
+  cats.filter(c => weekTotals[c.id]).forEach(c => {
+    lines.push(`  ${c.emoji} ${c.name}: ${fmtDuration(weekTotals[c.id])}`);
+  });
+  if (Object.keys(weekTotals).length === 0) lines.push('  記録なし');
+  lines.push(`  合計: ${weekMs > 0 ? fmtDuration(weekMs) : '0分'}`);
+
+  return lines.join('\n');
+}
+
+function copyExport() {
+  const text = document.getElementById('export-text').value;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✅ コピーしました';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 コピーしてノアに渡す';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+function addCat() {
+  const emoji = document.getElementById('new-emoji').value.trim() || '⭐';
+  const name = document.getElementById('new-name').value.trim();
+  if (!name) return;
+  cats.push({ id: uid(), name, emoji, color: cats.length % COLORS.length });
+  saveCats(cats);
+  renderSettings();
+  renderHome();
+}
+
+function deleteCat(id) {
+  if (!confirm('このカテゴリを削除しますか？（記録は残ります）')) return;
+  cats = cats.filter(c => c.id !== id);
+  saveCats(cats);
+  renderSettings();
+  renderHome();
+}
+
+// ── Tab switching ─────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-home').style.display = tab === 'home' ? '' : 'none';
+  document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
+  document.getElementById('tab-settings').style.display = tab === 'settings' ? '' : 'none';
+  ['home','history','settings'].forEach(t => {
+    document.getElementById('nav-'+t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'history') renderHistory();
+  if (tab === 'settings') renderSettings();
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderHome();
+</script>
+</body>
+</html>
