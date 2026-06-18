@@ -3,608 +3,331 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#7FA889">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="ぽんず時間ログ">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ぽんず時間ログ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg: #EEF1EA;
-  --panel: #fff;
-  --ink: #30322D;
-  --muted: #888B7E;
-  --soft: #F7F6EF;
-  --line: #E0DDD2;
-  --sage: #7FA889;     --sage-s: #E4EFE3;
-  --coral: #EFA888;    --coral-s: #FBE9E0;
-  --sky: #8FBED4;      --sky-s: #E4F0F4;
-  --lavender: #B6A4D6; --lavender-s: #EFE8F8;
-  --amber: #E5B65C;    --amber-s: #FBF1DC;
-  --rose: #DD9A9A;     --rose-s: #FBEAE9;
-  --shadow: 0 4px 18px rgba(48,50,45,.08);
-  --shadow-sm: 0 2px 8px rgba(48,50,45,.05);
-  --radius: 16px;
-}
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { color-scheme: light; }
 body {
   font-family: 'Zen Kaku Gothic New', 'Hiragino Sans', sans-serif;
-  background: linear-gradient(165deg, #F5F7F0 0%, var(--bg) 60%, #E8EDE4 100%);
-  color: var(--ink);
+  background: linear-gradient(165deg, #F5F7F0 0%, #EEF1EA 60%, #E8EDE4 100%);
   min-height: 100vh;
+  color: #30322D;
   -webkit-font-smoothing: antialiased;
 }
-.app { width: min(100%, 520px); margin: 0 auto; padding: 20px 16px calc(80px + env(safe-area-inset-bottom)); }
+.zm { font-family: 'Zen Maru Gothic', sans-serif; }
+.app { width: min(100%, 520px); margin: 0 auto; padding: 22px 16px calc(96px + env(safe-area-inset-bottom)); }
 
-/* Header */
-.header { margin-bottom: 20px; }
-.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .18em; color: var(--muted); font-family: 'Zen Maru Gothic', sans-serif; margin-bottom: 4px; }
-h1 { font-size: 24px; font-family: 'Zen Maru Gothic', sans-serif; font-weight: 900; }
-.today-total { font-size: 13px; color: var(--muted); margin-top: 4px; }
-.today-total span { color: var(--sage); font-weight: 700; }
+@keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.06);opacity:1} }
+@keyframes pulsering { 0%{transform:scale(.78);opacity:.5} 100%{transform:scale(1.5);opacity:0} }
+@keyframes sleepbob { 0%,100%{transform:translateY(0) rotate(-1.5deg)} 50%{transform:translateY(-2px) rotate(1.5deg)} }
+@keyframes barfill { from { width: 4% } }
+@keyframes toastin { from{opacity:0;transform:translate(-50%,8px)} to{opacity:1;transform:translate(-50%,0)} }
+@keyframes fadeup { from{transform:translateY(7px);opacity:0} to{transform:translateY(0);opacity:1} }
 
-/* Timer Card */
-.timer-card {
-  background: var(--panel);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow);
-  margin-bottom: 16px;
-}
-.timer-idle { text-align: center; }
-.timer-idle p { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
-.cat-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
-.cat-chip {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 14px; border-radius: 999px;
-  border: 2px solid var(--line);
-  background: var(--soft);
-  font-size: 14px; cursor: pointer;
-  transition: all .15s;
-  font-family: 'Zen Kaku Gothic New', sans-serif;
-}
-.cat-chip:active, .cat-chip.selected {
-  border-color: var(--accent, var(--sage));
-  background: var(--accent-s, var(--sage-s));
-}
-.cat-chip .emoji { font-size: 18px; }
+.header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+.mascot { width:50px; height:50px; border-radius:50%; background:#E4EFE3; display:flex; align-items:center; justify-content:center; flex:none; }
+.h-sub { font-size:11px; font-weight:700; letter-spacing:.18em; color:#a7aa9c; }
+.h-main { font-size:22px; font-weight:900; line-height:1.2; }
+.h-total { margin-left:auto; text-align:right; }
+.h-total-lbl { font-size:11px; color:#888B7E; }
+.h-total-val { font-size:19px; font-weight:900; color:#7FA889; }
 
-/* Active timer */
-.timer-active { text-align: center; }
-.timer-cat-label {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: var(--sage-s); color: var(--sage);
-  border-radius: 999px; padding: 6px 16px;
-  font-weight: 700; font-size: 14px; margin-bottom: 16px;
+.card { background:#fff; border-radius:20px; padding:22px 18px; box-shadow:0 4px 18px rgba(48,50,45,.08); margin-bottom:16px; }
+.card-sm { background:#fff; border-radius:18px; padding:18px; box-shadow:0 2px 8px rgba(48,50,45,.05); margin-bottom:8px; }
+.sec-title { font-size:13px; font-weight:700; color:#888B7E; letter-spacing:.1em; margin:22px 0 11px; }
+
+.chips { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; }
+.chip {
+  display:flex; align-items:center; gap:7px;
+  padding:10px 16px; border-radius:999px;
+  border:2px solid #E0DDD2; background:#F7F6EF;
+  font-size:14px; cursor:pointer;
+  font-family:'Zen Kaku Gothic New',sans-serif; color:#30322D;
+  transition:transform .12s, border-color .12s, background .12s;
+  -webkit-tap-highlight-color: transparent;
 }
-.timer-display {
-  font-family: 'Zen Maru Gothic', sans-serif;
-  font-size: 52px; font-weight: 900;
-  letter-spacing: .04em; color: var(--ink);
-  margin-bottom: 16px;
-  font-variant-numeric: tabular-nums;
+.chip:active { transform:scale(.94); border-color:#7FA889; background:#E4EFE3; }
+
+.active-card { text-align:center; }
+.active-pill {
+  display:inline-flex; align-items:center; gap:7px;
+  background:#E4EFE3; color:#5e8a69; border-radius:999px;
+  padding:6px 16px; font-weight:700; font-size:14px; margin-bottom:18px;
 }
+.ring-wrap { position:relative; width:188px; height:188px; margin:0 auto 18px; }
+.ring-base  { position:absolute; inset:0; border-radius:50%; border:8px solid #E4EFE3; animation:breathe 3.6s ease-in-out infinite; }
+.ring-arc   { position:absolute; inset:0; border-radius:50%; border:8px solid transparent; border-top-color:#7FA889; border-right-color:#7FA889; transform:rotate(48deg); }
+.ring-pulse { position:absolute; inset:6px; border-radius:50%; border:2px solid #7FA889; opacity:.35; animation:pulsering 3.2s ease-out infinite; }
+.ring-inner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.timer-num  { font-size:36px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.03em; }
+.watching   { font-size:11px; color:#aab0a2; margin-top:4px; animation:sleepbob 4s ease-in-out infinite; }
 .stop-btn {
-  background: var(--coral); color: #fff;
-  border: none; border-radius: 999px;
-  padding: 12px 32px; font-size: 16px; font-weight: 700;
-  cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif;
-  transition: opacity .15s;
+  background:#EFA888; color:#fff; border:none; border-radius:999px;
+  padding:13px 38px; font-size:16px; font-weight:700;
+  font-family:'Zen Maru Gothic',sans-serif; cursor:pointer;
+  transition:opacity .15s; -webkit-tap-highlight-color:transparent;
 }
-.stop-btn:active { opacity: .8; }
+.stop-btn:active { opacity:.8; }
 
-/* Section */
-.section-title {
-  font-family: 'Zen Maru Gothic', sans-serif;
-  font-size: 13px; font-weight: 700;
-  color: var(--muted); letter-spacing: .1em;
-  margin: 20px 0 10px;
+.donut-wrap { display:flex; align-items:center; gap:18px; }
+.donut { position:relative; width:104px; height:104px; flex:none; border-radius:50%; }
+.donut-hole { position:absolute; inset:17px; background:#fff; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.dh-lbl { font-size:9px; color:#888B7E; }
+.dh-val { font-size:15px; font-weight:900; }
+.legend { flex:1; display:flex; flex-direction:column; gap:9px; }
+.legend-row { display:flex; align-items:center; gap:8px; font-size:13px; }
+.l-chip { width:10px; height:10px; border-radius:3px; flex:none; }
+.l-dur { margin-left:auto; color:#888B7E; font-weight:700; }
+
+.empty { text-align:center; color:#a7aa9c; font-size:14px; padding:28px 0; background:#fff; border-radius:18px; box-shadow:0 2px 8px rgba(48,50,45,.05); }
+
+.period-row { display:flex; gap:7px; margin-bottom:14px; }
+.per-btn {
+  padding:6px 16px; border-radius:999px; font-size:13px; font-weight:700;
+  cursor:pointer; font-family:'Zen Kaku Gothic New',sans-serif;
+  transition:all .15s; border:1px solid #E0DDD2; background:#F7F6EF; color:#888B7E;
 }
+.per-btn.on { background:#7FA889; color:#fff; border-color:#7FA889; }
 
-/* Log bars */
-.log-bars { display: flex; flex-direction: column; gap: 8px; }
-.log-bar-row { background: var(--panel); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow-sm); }
-.log-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.log-bar-label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
-.log-bar-time { font-size: 13px; color: var(--muted); font-weight: 700; }
-.log-bar-track { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
-.log-bar-fill { height: 100%; border-radius: 999px; background: var(--accent, var(--sage)); transition: width .4s ease; }
+.hist-donut { position:relative; width:160px; height:160px; margin:0 auto; border-radius:50%; }
+.hist-hole { position:absolute; inset:26px; background:#fff; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.hh-lbl { font-size:11px; color:#888B7E; }
+.hh-val { font-size:24px; font-weight:900; }
+.hlegend { display:flex; flex-wrap:wrap; gap:8px 14px; justify-content:center; margin-top:16px; }
+.hl-row { display:flex; align-items:center; gap:6px; font-size:12px; }
+.hl-chip { width:9px; height:9px; border-radius:3px; }
 
-/* Sessions list */
-.sessions-list { display: flex; flex-direction: column; gap: 6px; }
-.session-item {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--panel); border-radius: 10px; padding: 10px 14px;
-  box-shadow: var(--shadow-sm); font-size: 13px;
-}
-.session-emoji { font-size: 16px; }
-.session-name { flex: 1; font-weight: 500; }
-.session-time { color: var(--muted); }
-.session-duration { font-weight: 700; color: var(--ink); min-width: 48px; text-align: right; }
-.session-del { color: var(--muted); background: none; border: none; cursor: pointer; font-size: 16px; padding: 0 0 0 4px; }
+.sess { display:flex; align-items:center; gap:10px; background:#fff; border-radius:10px; padding:11px 14px; box-shadow:0 2px 8px rgba(48,50,45,.05); font-size:13px; margin-bottom:6px; }
+.sess-name { flex:1; font-weight:500; }
+.sess-time { color:#888B7E; }
+.sess-dur  { font-weight:700; min-width:48px; text-align:right; }
+.sess-del  { color:#b5b8ac; background:none; border:none; cursor:pointer; font-size:16px; padding:0 0 0 4px; }
 
-/* Export box */
-.export-box { background: var(--panel); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); }
-.export-text { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 12px; font-family: monospace; background: var(--soft); color: var(--ink); resize: none; min-height: 100px; }
-.copy-btn {
-  width: 100%; margin-top: 10px;
-  background: var(--sage); color: #fff;
-  border: none; border-radius: 999px;
-  padding: 11px; font-size: 15px; font-weight: 700;
-  cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif;
-  transition: opacity .15s;
-}
-.copy-btn:active { opacity: .8; }
-.copy-btn.copied { background: var(--amber); }
-
-/* Category manager */
-.cat-manager { display: flex; flex-direction: column; gap: 8px; }
 .cat-item {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--panel); border-radius: 12px; padding: 12px 14px;
-  box-shadow: var(--shadow-sm);
+  display:flex; align-items:center; gap:11px;
+  background:#fff; border-radius:12px; padding:12px 14px;
+  box-shadow:0 2px 8px rgba(48,50,45,.05); margin-bottom:8px;
 }
-.cat-item-emoji { font-size: 20px; }
-.cat-item-name { flex: 1; font-weight: 500; }
-.cat-item-del { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); }
-.add-cat-form { display: flex; gap: 8px; margin-top: 8px; }
-.add-cat-emoji { width: 44px; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; font-size: 18px; font-family: inherit; background: var(--soft); }
-.add-cat-name { flex: 1; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; font-family: inherit; background: var(--soft); color: var(--ink); }
-.add-cat-btn { background: var(--sage); color: #fff; border: none; border-radius: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Zen Maru Gothic', sans-serif; }
+.ci-del { background:none; border:none; cursor:pointer; font-size:18px; color:#b5b8ac; }
+.add-row { display:flex; gap:8px; margin-top:8px; }
+.inp-e { width:46px; text-align:center; border:1px solid #E0DDD2; border-radius:10px; padding:9px; font-size:18px; font-family:inherit; background:#F7F6EF; }
+.inp-n { flex:1; border:1px solid #E0DDD2; border-radius:10px; padding:9px 12px; font-size:14px; font-family:inherit; background:#F7F6EF; color:#30322D; }
+.inp-e:focus,.inp-n:focus { outline:2px solid #7FA889; outline-offset:-1px; }
+.add-btn { background:#7FA889; color:#fff; border:none; border-radius:10px; padding:9px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Zen Maru Gothic',sans-serif; }
 
-/* Empty state */
-.empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0; }
+.export-card { background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 8px rgba(48,50,45,.05); }
+.exp-ta { width:100%; border:1px solid #E0DDD2; border-radius:10px; padding:12px; font-size:12px; font-family:monospace; background:#F7F6EF; color:#30322D; resize:none; min-height:148px; line-height:1.6; }
+.copy-btn { width:100%; margin-top:10px; border:none; border-radius:999px; padding:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:'Zen Maru Gothic',sans-serif; color:#fff; transition:background .2s; }
+.copy-btn:active { opacity:.85; }
+.noah-note { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:18px; color:#b5b8ac; font-size:11px; }
 
-/* Tab nav */
-.tab-nav {
-  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-  width: min(100%, 520px);
-  background: rgba(255,255,255,.92);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
-  display: flex;
-  padding-bottom: env(safe-area-inset-bottom);
+.nav {
+  position:fixed; bottom:0; left:50%; transform:translateX(-50%);
+  width:min(100%, 520px);
+  background:rgba(255,255,255,.92); backdrop-filter:blur(12px);
+  border-top:1px solid #E0DDD2; display:flex; z-index:50;
+  padding-bottom:env(safe-area-inset-bottom);
 }
-.tab-btn {
-  flex: 1; border: none; background: none;
-  padding: 10px 0; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  font-family: 'Zen Kaku Gothic New', sans-serif;
-  font-size: 10px; color: var(--muted);
-  transition: color .15s;
+.nav-btn {
+  flex:1; border:none; background:none; padding:11px 0; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:3px;
+  font-family:'Zen Kaku Gothic New',sans-serif; font-size:10px; font-weight:700;
+  color:#b5b8ac; transition:color .15s; -webkit-tap-highlight-color:transparent;
 }
-.tab-btn.active { color: var(--sage); }
-.tab-btn svg { width: 22px; height: 22px; }
+.nav-btn.on { color:#7FA889; }
 
-/* Period selector */
-.period-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-.period-btn {
-  padding: 5px 14px; border-radius: 999px; border: 1px solid var(--line);
-  background: var(--soft); font-size: 12px; font-weight: 700; cursor: pointer;
-  font-family: 'Zen Kaku Gothic New', sans-serif; color: var(--muted);
-  transition: all .15s;
-}
-.period-btn.active { background: var(--sage); color: #fff; border-color: var(--sage); }
-
-/* Toast */
 .toast {
-  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-  background: var(--ink); color: #fff; border-radius: 999px;
-  padding: 10px 20px; font-size: 13px; font-weight: 700;
-  opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 100;
-  font-family: 'Zen Maru Gothic', sans-serif;
-  white-space: nowrap;
+  position:fixed; bottom:88px; left:50%; transform:translateX(-50%);
+  background:#30322D; color:#fff; border-radius:999px;
+  padding:11px 22px; font-size:13px; font-weight:700;
+  z-index:100; font-family:'Zen Maru Gothic',sans-serif;
+  white-space:nowrap; box-shadow:0 6px 20px rgba(48,50,45,.25);
+  animation:toastin .3s ease; pointer-events:none;
 }
-.toast.show { opacity: 1; }
+.tab { animation:fadeup .3s ease; }
 </style>
 </head>
 <body>
-<div class="app" id="app">
-  <div class="header">
-    <div class="eyebrow">PONZU TIME LOG</div>
-    <h1>ぽんず時間ログ</h1>
-    <div class="today-total">今日の合計：<span id="today-total">0分</span></div>
-  </div>
-  <div id="tab-home"></div>
-  <div id="tab-history" style="display:none"></div>
-  <div id="tab-settings" style="display:none"></div>
-</div>
-
-<nav class="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('home')" id="nav-home">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-    ホーム
-  </button>
-  <button class="tab-btn" onclick="switchTab('history')" id="nav-history">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-    記録
-  </button>
-  <button class="tab-btn" onclick="switchTab('settings')" id="nav-settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-    設定
-  </button>
-</nav>
-
-<div class="toast" id="toast"></div>
-
+<div class="app" id="app"></div>
 <script>
-// ── Data ──────────────────────────────────────────────────────────
-const COLORS = [
-  { name: 'sage',     val: 'var(--sage)',     soft: 'var(--sage-s)' },
-  { name: 'coral',    val: 'var(--coral)',    soft: 'var(--coral-s)' },
-  { name: 'sky',      val: 'var(--sky)',      soft: 'var(--sky-s)' },
-  { name: 'lavender', val: 'var(--lavender)', soft: 'var(--lavender-s)' },
-  { name: 'amber',    val: 'var(--amber)',    soft: 'var(--amber-s)' },
-  { name: 'rose',     val: 'var(--rose)',     soft: 'var(--rose-s)' },
+const COLORS=[
+  {val:'#7FA889',soft:'#E4EFE3'},
+  {val:'#EFA888',soft:'#FBE9E0'},
+  {val:'#8FBED4',soft:'#E4F0F4'},
+  {val:'#B6A4D6',soft:'#EFE8F8'},
+  {val:'#E5B65C',soft:'#FBF1DC'},
+  {val:'#DD9A9A',soft:'#FBEAE9'},
 ];
+const col=i=>COLORS[((i%COLORS.length)+COLORS.length)%COLORS.length];
 
-function loadCats() {
-  try { return JSON.parse(localStorage.getItem('timelog_categories_v1')) || defaultCats(); }
-  catch { return defaultCats(); }
-}
-function saveCats(c) { localStorage.setItem('timelog_categories_v1', JSON.stringify(c)); }
-function defaultCats() {
-  return [
-    { id: '1', name: 'ぽんずアプリ開発', emoji: '🍊', color: 0 },
-    { id: '2', name: 'ノア開発', emoji: '🌿', color: 1 },
-    { id: '3', name: 'インプット', emoji: '📚', color: 2 },
-    { id: '4', name: '仕事', emoji: '💼', color: 3 },
-    { id: '5', name: '休憩', emoji: '☕', color: 4 },
-  ];
-}
+function defCats(){return[
+  {id:'1',name:'ぽんずアプリ開発',emoji:'🍊',color:0},
+  {id:'2',name:'ノア開発',emoji:'🌿',color:1},
+  {id:'3',name:'インプット',emoji:'📚',color:2},
+  {id:'4',name:'仕事',emoji:'💼',color:3},
+  {id:'5',name:'休憩',emoji:'☕',color:4},
+];}
+const lj=k=>{try{return JSON.parse(localStorage.getItem(k))||null}catch{return null}};
+let cats=lj('timelog_categories_v1')||defCats();
+let sessions=lj('timelog_sessions_v1')||[];
+let active=lj('timelog_active_v1')||null;
+let tab='home',period='today',toastMsg='',copied=false,toastT,copyT,tickT;
 
-function loadSessions() {
-  try { return JSON.parse(localStorage.getItem('timelog_sessions_v1')) || []; }
-  catch { return []; }
-}
-function saveSessions(s) { localStorage.setItem('timelog_sessions_v1', JSON.stringify(s)); }
+const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const saveCats=()=>sv('timelog_categories_v1',cats);
+const saveSess=()=>sv('timelog_sessions_v1',sessions);
+const saveAct=()=>active?sv('timelog_active_v1',active):localStorage.removeItem('timelog_active_v1');
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
+const getCat=id=>cats.find(c=>c.id===id)||{name:'不明',emoji:'❓',color:0};
 
-function loadActive() {
-  try { return JSON.parse(localStorage.getItem('timelog_active_v1')) || null; }
-  catch { return null; }
-}
-function saveActive(a) {
-  if (a) localStorage.setItem('timelog_active_v1', JSON.stringify(a));
-  else localStorage.removeItem('timelog_active_v1');
-}
-
-// ── State ─────────────────────────────────────────────────────────
-let cats = loadCats();
-let sessions = loadSessions();
-let active = loadActive();
-let timerInterval = null;
-let currentTab = 'home';
-let historyPeriod = 'today';
-
-// ── Utils ─────────────────────────────────────────────────────────
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-
-function fmtDuration(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h${String(m % 60).padStart(2,'0')}m`;
-  return `${m}m`;
+function fmtDur(ms){const m=Math.floor(ms/60000),h=Math.floor(m/60);return h>0?h+'h'+String(m%60).padStart(2,'0')+'m':m+'m';}
+function fmtTimer(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);return String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
+function fmtTime(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+const isToday=iso=>new Date(iso).toLocaleDateString('ja-JP')===new Date().toLocaleDateString('ja-JP');
+const isWeek=iso=>{const d=Date.now()-new Date(iso).getTime();return d>=0&&d<7*864e5;};
+function sum(fn){const t={};sessions.filter(s=>fn(s.startedAt)).forEach(s=>{t[s.categoryId]=(t[s.categoryId]||0)+s.duration});return t;}
+function totMs(fn){return sessions.filter(s=>fn(s.startedAt)).reduce((a,s)=>a+s.duration,0);}
+function donutBg(totals){
+  const entries=cats.filter(c=>totals[c.id]).map(c=>({c,ms:totals[c.id]}));
+  const s=entries.reduce((a,e)=>a+e.ms,0);
+  if(!s)return'#E4EFE3';
+  let acc=0;
+  return'conic-gradient('+entries.map(e=>{const st=(acc/s*100).toFixed(2);acc+=e.ms;return col(e.c.color).val+' '+st+'% '+(acc/s*100).toFixed(2)+'%';}).join(',')+')';
 }
 
-function fmtTimer(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  return `${String(h).padStart(2,'0')}:${String(m%60).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+function showToast(msg){toastMsg=msg;render();if(toastT)clearTimeout(toastT);toastT=setTimeout(()=>{toastMsg='';render();},2000);}
+function startTimer(id){active={id:uid(),categoryId:id,startedAt:new Date().toISOString()};saveAct();startTick();render();}
+function stopTimer(){
+  if(!active)return; stopTick();
+  const dur=Date.now()-new Date(active.startedAt).getTime();
+  if(dur>3000){sessions.push({id:active.id,categoryId:active.categoryId,startedAt:active.startedAt,endedAt:new Date().toISOString(),duration:dur});saveSess();showToast('記録しました！ '+fmtDur(dur));}
+  active=null;saveAct();render();
 }
-
-function fmtTime(iso) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+function delSess(id){sessions=sessions.filter(s=>s.id!==id);saveSess();render();}
+function addCat(){
+  const e=(document.getElementById('ie')?.value.trim())||'⭐';
+  const n=document.getElementById('in')?.value.trim();
+  if(!n)return;
+  cats.push({id:uid(),name:n,emoji:e,color:cats.length%COLORS.length});saveCats();render();
 }
-
-function todayStr() { return new Date().toLocaleDateString('ja-JP'); }
-
-function isToday(iso) {
-  return new Date(iso).toLocaleDateString('ja-JP') === todayStr();
+function delCat(id){if(!confirm('このカテゴリを削除しますか？（記録は残ります）'))return;cats=cats.filter(c=>c.id!==id);saveCats();render();}
+function buildExp(){
+  const now=new Date(),wAgo=new Date(Date.now()-7*864e5);
+  const f=d=>(d.getMonth()+1)+'/'+d.getDate();
+  const tt=sum(isToday),wt=sum(isWeek),tm=totMs(isToday),wm=totMs(isWeek);
+  const L=['【ぽんず時間ログ】'+f(now),'','▼ 今日'];
+  cats.filter(c=>tt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(tt[c.id])));
+  if(!Object.keys(tt).length)L.push('  記録なし');
+  L.push('  合計: '+(tm>0?fmtDur(tm):'0分'),'','▼ 今週（'+f(wAgo)+'〜'+f(now)+'）');
+  cats.filter(c=>wt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(wt[c.id])));
+  if(!Object.keys(wt).length)L.push('  記録なし');
+  L.push('  合計: '+(wm>0?fmtDur(wm):'0分'));
+  return L.join('\n');
 }
+function copyExp(){navigator.clipboard.writeText(buildExp()).then(()=>{copied=true;render();showToast('✅ コピーしました');if(copyT)clearTimeout(copyT);copyT=setTimeout(()=>{copied=false;render();},2000);});}
+function startTick(){stopTick();tickT=setInterval(()=>{if(active)render();},1000);}
+function stopTick(){if(tickT){clearInterval(tickT);tickT=null;}}
+if(active)startTick();
+function switchTab(t){tab=t;render();}
+function setPer(p){period=p;render();}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-function isThisWeek(iso) {
-  const d = new Date(iso);
-  const now = new Date();
-  const diff = now - d;
-  return diff >= 0 && diff < 7 * 24 * 60 * 60 * 1000;
-}
+const PONZU=`<svg viewBox="0 0 64 64" style="width:44px;height:44px;overflow:visible">
+<ellipse cx="14" cy="38" rx="10" ry="13" fill="#fff"/><ellipse cx="50" cy="38" rx="10" ry="13" fill="#fff"/>
+<circle cx="22" cy="20" r="11" fill="#fff"/><circle cx="42" cy="20" r="11" fill="#fff"/><circle cx="32" cy="15" r="12" fill="#fff"/>
+<circle cx="18" cy="31" r="11" fill="#fff"/><circle cx="46" cy="31" r="11" fill="#fff"/><circle cx="32" cy="34" r="19" fill="#fff"/>
+<ellipse cx="25.5" cy="32" rx="2.5" ry="3.1" fill="#30322D"/><ellipse cx="38.5" cy="32" rx="2.5" ry="3.1" fill="#30322D"/>
+<circle cx="26.4" cy="31" r=".7" fill="#fff"/><circle cx="39.4" cy="31" r=".7" fill="#fff"/>
+<ellipse cx="32" cy="39" rx="3.2" ry="2.4" fill="#30322D"/>
+<path d="M32 41 q-2.6 3.4-5.4 1.6 M32 41 q2.6 3.4 5.4 1.6" stroke="#30322D" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+<circle cx="20" cy="37" r="2.6" fill="#FBE9E0"/><circle cx="44" cy="37" r="2.6" fill="#FBE9E0"/>
+</svg>`;
+const NOAH=`<svg viewBox="0 0 64 64" style="width:22px;height:22px;overflow:visible"><ellipse cx="32" cy="27" rx="11" ry="13" fill="#cfcabd"/><path d="M21 28 q0-16 11-16 q11 0 11 16 q-3.5-8-11-8 q-7.5 0-11 8 z" fill="#8a8779"/><ellipse cx="28" cy="29" rx="1.3" ry="1.7" fill="#fff"/><ellipse cx="36" cy="29" rx="1.3" ry="1.7" fill="#fff"/></svg>`;
 
-function getCat(id) { return cats.find(c => c.id === id) || { name: '不明', emoji: '❓', color: 0 }; }
+function render(){
+  const fn=period==='today'?isToday:isWeek;
+  const hl=period==='today'?'今日':'今週';
+  const td=sum(isToday),tm=totMs(isToday);
+  const live=tm+(active?Date.now()-new Date(active.startedAt).getTime():0);
+  const hd=sum(fn),hm=totMs(fn);
 
-function getColor(idx) { return COLORS[idx % COLORS.length]; }
+  let h=`<div class="header">
+<div class="mascot">${PONZU}</div>
+<div class="zm"><div class="h-sub">PONZU TIME LOG</div><div class="h-main">ぽんず時間ログ</div></div>
+<div class="h-total zm"><div class="h-total-lbl">今日の合計</div><div class="h-total-val">${live<60000?'0分':fmtDur(live)}</div></div>
+</div>`;
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2000);
-}
-
-// ── Summaries ─────────────────────────────────────────────────────
-function summarize(filterFn) {
-  const totals = {};
-  sessions.filter(s => filterFn(s.startedAt)).forEach(s => {
-    totals[s.categoryId] = (totals[s.categoryId] || 0) + s.duration;
-  });
-  return totals;
-}
-
-function totalMs(filterFn) {
-  return sessions.filter(s => filterFn(s.startedAt)).reduce((sum, s) => sum + s.duration, 0);
-}
-
-function updateTodayTotal() {
-  const ms = totalMs(isToday) + (active ? Date.now() - new Date(active.startedAt).getTime() : 0);
-  document.getElementById('today-total').textContent = ms < 60000 ? '0分' : fmtDuration(ms);
-}
-
-// ── Timer ─────────────────────────────────────────────────────────
-function startTimer(catId) {
-  active = { id: uid(), categoryId: catId, startedAt: new Date().toISOString() };
-  saveActive(active);
-  startTick();
-  renderHome();
-}
-
-function stopTimer() {
-  if (!active) return;
-  clearInterval(timerInterval);
-  const duration = Date.now() - new Date(active.startedAt).getTime();
-  if (duration > 3000) {
-    sessions.push({ id: active.id, categoryId: active.categoryId, startedAt: active.startedAt, endedAt: new Date().toISOString(), duration });
-    saveSessions(sessions);
-    showToast(`記録しました！ ${fmtDuration(duration)}`);
+  if(tab==='home'){
+    h+=`<div class="tab">`;
+    if(active){
+      const c=getCat(active.categoryId);
+      const el=Date.now()-new Date(active.startedAt).getTime();
+      h+=`<div class="card active-card">
+<div class="active-pill zm">${c.emoji} ${esc(c.name)}</div>
+<div class="ring-wrap"><div class="ring-base"></div><div class="ring-arc"></div><div class="ring-pulse"></div>
+<div class="ring-inner"><div class="timer-num zm">${fmtTimer(el)}</div><div class="watching">🐾 ぽんず見守り中</div></div></div>
+<button class="stop-btn" onclick="stopTimer()">■ 停止</button>
+</div>`;
+    } else {
+      h+=`<div class="card" style="text-align:center"><p style="color:#888B7E;font-size:14px;margin-bottom:16px">カテゴリを選んで計測を開始</p>
+<div class="chips">${cats.map(c=>`<button class="chip" onclick="startTimer('${c.id}')"><span style="font-size:18px">${c.emoji}</span>${esc(c.name)}</button>`).join('')}</div></div>`;
+    }
+    h+=`<div class="sec-title zm">今日の内訳</div>`;
+    const tb=cats.filter(c=>td[c.id]);
+    if(!tb.length){
+      h+=`<div class="empty">今日の記録はまだありません<br><span style="font-size:24px;display:inline-block;margin-top:8px">🐶</span></div>`;
+    } else {
+      h+=`<div class="card-sm donut-wrap">
+<div class="donut zm" style="background:${donutBg(td)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tm>=60000?fmtDur(tm):'0分'}</div></div></div>
+<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(td[c.id])}</span></div>`).join('')}</div>
+</div>`;
+    }
+    h+=`</div>`;
   }
-  active = null;
-  saveActive(null);
-  renderHome();
-  if (currentTab === 'history') renderHistory();
-}
-
-function startTick() {
-  clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
-    if (!active) return;
-    const el = document.getElementById('timer-display');
-    if (el) el.textContent = fmtTimer(Date.now() - new Date(active.startedAt).getTime());
-    updateTodayTotal();
-  }, 1000);
-}
-
-if (active) startTick();
-
-// ── Render: Home ──────────────────────────────────────────────────
-function renderHome() {
-  updateTodayTotal();
-  const el = document.getElementById('tab-home');
-
-  // Timer card
-  let timerHTML = '';
-  if (active) {
-    const cat = getCat(active.categoryId);
-    const color = getColor(cat.color);
-    const elapsed = Date.now() - new Date(active.startedAt).getTime();
-    timerHTML = `
-      <div class="timer-card">
-        <div class="timer-active">
-          <div class="timer-cat-label">${cat.emoji} ${cat.name}</div>
-          <div class="timer-display" id="timer-display">${fmtTimer(elapsed)}</div>
-          <button class="stop-btn" onclick="stopTimer()">■ 停止</button>
-        </div>
-      </div>`;
-  } else {
-    const chips = cats.map(c => {
-      const color = getColor(c.color);
-      return `<button class="cat-chip" style="--accent:${color.val};--accent-s:${color.soft}" onclick="startTimer('${c.id}')">
-        <span class="emoji">${c.emoji}</span>${c.name}
-      </button>`;
-    }).join('');
-    timerHTML = `
-      <div class="timer-card">
-        <div class="timer-idle">
-          <p>カテゴリを選んで計測を開始</p>
-          <div class="cat-grid">${chips}</div>
-        </div>
-      </div>`;
+  else if(tab==='history'){
+    const hb=cats.filter(c=>hd[c.id]);
+    const hs=[...sessions].filter(s=>fn(s.startedAt)).reverse();
+    h+=`<div class="tab">
+<div class="period-row"><button class="per-btn${period==='today'?' on':''}" onclick="setPer('today')">今日</button><button class="per-btn${period==='week'?' on':''}" onclick="setPer('week')">今週</button></div>
+<div class="card" style="text-align:center;margin-bottom:8px">
+<div class="hist-donut zm" style="background:${donutBg(hd)}"><div class="hist-hole"><div class="hh-lbl">${hl}の合計</div><div class="hh-val">${hm>0?fmtDur(hm):'0分'}</div></div></div>
+<div class="hlegend">${hb.map(c=>`<div class="hl-row"><span class="hl-chip" style="background:${col(c.color).val}"></span>${c.emoji} ${esc(c.name)} <b>${fmtDur(hd[c.id])}</b></div>`).join('')}</div>
+</div>
+<div class="sec-title zm">${hl}のセッション</div>`;
+    if(!hs.length)h+=`<div style="text-align:center;color:#a7aa9c;font-size:14px;padding:24px 0">記録がありません</div>`;
+    else h+=hs.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
+    h+=`</div>`;
+  }
+  else if(tab==='settings'){
+    h+=`<div class="tab">
+<div class="sec-title zm" style="margin-top:6px">カテゴリ管理</div>
+${cats.map(c=>`<div class="cat-item" style="border-left:3px solid ${col(c.color).val}"><span style="font-size:20px">${c.emoji}</span><span style="flex:1;font-weight:500">${esc(c.name)}</span><button class="ci-del" onclick="delCat('${c.id}')">×</button></div>`).join('')}
+<div class="add-row"><input id="ie" class="inp-e" placeholder="🍀" maxlength="2"><input id="in" class="inp-n" placeholder="カテゴリ名" maxlength="20"><button class="add-btn" onclick="addCat()">追加</button></div>
+<div class="sec-title zm">ノアへのエクスポート</div>
+<div class="export-card">
+<textarea class="exp-ta" readonly>${esc(buildExp())}</textarea>
+<button class="copy-btn" style="background:${copied?'#E5B65C':'#7FA889'}" onclick="copyExp()">${copied?'✅ コピーしました':'📋 コピーしてノアに渡す'}</button>
+</div>
+<div class="noah-note">${NOAH} 執事ノアに渡せる形式でまとめています</div>
+</div>`;
   }
 
-  // Today's bars
-  const todayTotals = summarize(isToday);
-  const todayMs = totalMs(isToday) + (active ? Date.now() - new Date(active.startedAt).getTime() : 0);
-  const maxMs = Math.max(...Object.values(todayTotals), 1);
+  h+=`<nav class="nav">
+<button class="nav-btn${tab==='home'?' on':''}" onclick="switchTab('home')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>ホーム</button>
+<button class="nav-btn${tab==='history'?' on':''}" onclick="switchTab('history')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>記録</button>
+<button class="nav-btn${tab==='settings'?' on':''}" onclick="switchTab('settings')">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>設定</button>
+</nav>`;
 
-  let barsHTML = '';
-  if (Object.keys(todayTotals).length === 0 && !active) {
-    barsHTML = '<div class="empty">今日の記録はまだありません</div>';
-  } else {
-    const rows = cats.filter(c => todayTotals[c.id]).map(c => {
-      const color = getColor(c.color);
-      const pct = Math.round((todayTotals[c.id] / maxMs) * 100);
-      return `<div class="log-bar-row">
-        <div class="log-bar-header">
-          <div class="log-bar-label">${c.emoji} ${c.name}</div>
-          <div class="log-bar-time">${fmtDuration(todayTotals[c.id])}</div>
-        </div>
-        <div class="log-bar-track"><div class="log-bar-fill" style="width:${pct}%;background:${color.val}"></div></div>
-      </div>`;
-    }).join('');
-    barsHTML = rows || '<div class="empty">計測を開始してください</div>';
-  }
-
-  el.innerHTML = timerHTML + `
-    <div class="section-title">今日の内訳</div>
-    <div class="log-bars">${barsHTML}</div>`;
+  if(toastMsg)h+=`<div class="toast">${esc(toastMsg)}</div>`;
+  document.getElementById('app').innerHTML=h;
 }
-
-// ── Render: History ───────────────────────────────────────────────
-function renderHistory() {
-  const el = document.getElementById('tab-history');
-  const filterFn = historyPeriod === 'today' ? isToday : isThisWeek;
-  const label = historyPeriod === 'today' ? '今日' : '今週';
-
-  const filtered = [...sessions].filter(s => filterFn(s.startedAt)).reverse();
-  const totals = summarize(filterFn);
-  const totalMsVal = totalMs(filterFn);
-  const maxMs = Math.max(...Object.values(totals), 1);
-
-  const periodTabs = `<div class="period-tabs">
-    <button class="period-btn ${historyPeriod==='today'?'active':''}" onclick="setPeriod('today')">今日</button>
-    <button class="period-btn ${historyPeriod==='week'?'active':''}" onclick="setPeriod('week')">今週</button>
-  </div>`;
-
-  const bars = cats.filter(c => totals[c.id]).map(c => {
-    const color = getColor(c.color);
-    const pct = Math.round((totals[c.id] / maxMs) * 100);
-    return `<div class="log-bar-row">
-      <div class="log-bar-header">
-        <div class="log-bar-label">${c.emoji} ${c.name}</div>
-        <div class="log-bar-time">${fmtDuration(totals[c.id])}</div>
-      </div>
-      <div class="log-bar-track"><div class="log-bar-fill" style="width:${pct}%;background:${getColor(c.color).val}"></div></div>
-    </div>`;
-  }).join('') || '<div class="empty">記録がありません</div>';
-
-  const sessionItems = filtered.map(s => {
-    const cat = getCat(s.categoryId);
-    const color = getColor(cat.color);
-    return `<div class="session-item">
-      <span class="session-emoji">${cat.emoji}</span>
-      <span class="session-name">${cat.name}</span>
-      <span class="session-time">${fmtTime(s.startedAt)}</span>
-      <span class="session-duration">${fmtDuration(s.duration)}</span>
-      <button class="session-del" onclick="deleteSession('${s.id}')">×</button>
-    </div>`;
-  }).join('') || '<div class="empty">記録がありません</div>';
-
-  el.innerHTML = periodTabs + `
-    <div class="section-title">${label}の合計：${totalMsVal > 0 ? fmtDuration(totalMsVal) : '0分'}</div>
-    <div class="log-bars">${bars}</div>
-    <div class="section-title">${label}のセッション</div>
-    <div class="sessions-list">${sessionItems}</div>`;
-}
-
-function setPeriod(p) { historyPeriod = p; renderHistory(); }
-
-function deleteSession(id) {
-  sessions = sessions.filter(s => s.id !== id);
-  saveSessions(sessions);
-  renderHistory();
-  updateTodayTotal();
-}
-
-// ── Render: Settings ──────────────────────────────────────────────
-function renderSettings() {
-  const el = document.getElementById('tab-settings');
-
-  const catItems = cats.map(c => {
-    const color = getColor(c.color);
-    return `<div class="cat-item" style="border-left: 3px solid ${color.val}">
-      <span class="cat-item-emoji">${c.emoji}</span>
-      <span class="cat-item-name">${c.name}</span>
-      <button class="cat-item-del" onclick="deleteCat('${c.id}')">×</button>
-    </div>`;
-  }).join('');
-
-  // Export
-  const exportText = buildExportText();
-
-  el.innerHTML = `
-    <div class="section-title">カテゴリ管理</div>
-    <div class="cat-manager">
-      ${catItems}
-      <div class="add-cat-form">
-        <input class="add-cat-emoji" id="new-emoji" placeholder="🍀" maxlength="2">
-        <input class="add-cat-name" id="new-name" placeholder="カテゴリ名" maxlength="20">
-        <button class="add-cat-btn" onclick="addCat()">追加</button>
-      </div>
-    </div>
-
-    <div class="section-title">ノアへのエクスポート</div>
-    <div class="export-box">
-      <textarea class="export-text" id="export-text" readonly>${exportText}</textarea>
-      <button class="copy-btn" id="copy-btn" onclick="copyExport()">📋 コピーしてノアに渡す</button>
-    </div>`;
-}
-
-function buildExportText() {
-  const now = new Date();
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-  const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
-  const todayTotals = summarize(isToday);
-  const weekTotals = summarize(isThisWeek);
-  const todayMs = totalMs(isToday);
-  const weekMs = totalMs(isThisWeek);
-
-  let lines = [`【ぽんず時間ログ】${fmt(now)}`,''];
-  lines.push('▼ 今日');
-  cats.filter(c => todayTotals[c.id]).forEach(c => {
-    lines.push(`  ${c.emoji} ${c.name}: ${fmtDuration(todayTotals[c.id])}`);
-  });
-  if (Object.keys(todayTotals).length === 0) lines.push('  記録なし');
-  lines.push(`  合計: ${todayMs > 0 ? fmtDuration(todayMs) : '0分'}`);
-  lines.push('');
-  lines.push(`▼ 今週（${fmt(weekAgo)}〜${fmt(now)}）`);
-  cats.filter(c => weekTotals[c.id]).forEach(c => {
-    lines.push(`  ${c.emoji} ${c.name}: ${fmtDuration(weekTotals[c.id])}`);
-  });
-  if (Object.keys(weekTotals).length === 0) lines.push('  記録なし');
-  lines.push(`  合計: ${weekMs > 0 ? fmtDuration(weekMs) : '0分'}`);
-
-  return lines.join('\n');
-}
-
-function copyExport() {
-  const text = document.getElementById('export-text').value;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copy-btn');
-    btn.textContent = '✅ コピーしました';
-    btn.classList.add('copied');
-    setTimeout(() => {
-      btn.textContent = '📋 コピーしてノアに渡す';
-      btn.classList.remove('copied');
-    }, 2000);
-  });
-}
-
-function addCat() {
-  const emoji = document.getElementById('new-emoji').value.trim() || '⭐';
-  const name = document.getElementById('new-name').value.trim();
-  if (!name) return;
-  cats.push({ id: uid(), name, emoji, color: cats.length % COLORS.length });
-  saveCats(cats);
-  renderSettings();
-  renderHome();
-}
-
-function deleteCat(id) {
-  if (!confirm('このカテゴリを削除しますか？（記録は残ります）')) return;
-  cats = cats.filter(c => c.id !== id);
-  saveCats(cats);
-  renderSettings();
-  renderHome();
-}
-
-// ── Tab switching ─────────────────────────────────────────────────
-function switchTab(tab) {
-  currentTab = tab;
-  document.getElementById('tab-home').style.display = tab === 'home' ? '' : 'none';
-  document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
-  document.getElementById('tab-settings').style.display = tab === 'settings' ? '' : 'none';
-  ['home','history','settings'].forEach(t => {
-    document.getElementById('nav-'+t).classList.toggle('active', t === tab);
-  });
-  if (tab === 'history') renderHistory();
-  if (tab === 'settings') renderSettings();
-}
-
-// ── Init ──────────────────────────────────────────────────────────
-renderHome();
+render();
 </script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
