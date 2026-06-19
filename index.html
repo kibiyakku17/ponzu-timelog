@@ -22,9 +22,9 @@ body {
 @keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.06);opacity:1} }
 @keyframes pulsering { 0%{transform:scale(.78);opacity:.5} 100%{transform:scale(1.5);opacity:0} }
 @keyframes sleepbob { 0%,100%{transform:translateY(0) rotate(-1.5deg)} 50%{transform:translateY(-2px) rotate(1.5deg)} }
-@keyframes barfill { from { width: 4% } }
 @keyframes toastin { from{opacity:0;transform:translate(-50%,8px)} to{opacity:1;transform:translate(-50%,0)} }
 @keyframes fadeup { from{transform:translateY(7px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes slidedown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 
 .header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
 .mascot { width:50px; height:50px; border-radius:50%; background:#E4EFE3; display:flex; align-items:center; justify-content:center; flex:none; }
@@ -49,7 +49,35 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .chip:active { transform:scale(.94); border-color:#7FA889; background:#E4EFE3; }
+.chip.running {
+  border-color:#7FA889; background:#E4EFE3; color:#5e8a69;
+  opacity:.6; cursor:not-allowed;
+}
 
+/* ── 複数アクティブタイマー ── */
+.active-list { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.active-row {
+  background:#fff; border-radius:16px;
+  padding:14px 16px;
+  box-shadow:0 4px 18px rgba(48,50,45,.08);
+  display:flex; align-items:center; gap:12px;
+  animation:slidedown .25s ease;
+  border-left:4px solid var(--accent-color, #7FA889);
+}
+.ar-emoji { font-size:24px; flex:none; }
+.ar-info { flex:1; min-width:0; }
+.ar-name { font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700; }
+.ar-timer { font-family:'Zen Maru Gothic',sans-serif; font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.03em; color:#7FA889; }
+.ar-stop {
+  background:#EFA888; color:#fff; border:none; border-radius:999px;
+  padding:8px 16px; font-size:13px; font-weight:700;
+  font-family:'Zen Maru Gothic',sans-serif; cursor:pointer;
+  flex:none; transition:opacity .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.ar-stop:active { opacity:.8; }
+
+/* 既存の単一タイマー UI（並走なしのとき） */
 .active-card { text-align:center; }
 .active-pill {
   display:inline-flex; align-items:center; gap:7px;
@@ -169,16 +197,26 @@ function defCats(){return[
   {id:'4',name:'仕事',emoji:'💼',color:3},
   {id:'5',name:'休憩',emoji:'☕',color:4},
 ];}
+
 const lj=k=>{try{return JSON.parse(localStorage.getItem(k))||null}catch{return null}};
 let cats=lj('timelog_categories_v1')||defCats();
 let sessions=lj('timelog_sessions_v1')||[];
-let active=lj('timelog_active_v1')||null;
+
+// v2: actives は配列。旧 active（単一）との互換移行
+let actives=(()=>{
+  const v2=lj('timelog_actives_v2');
+  if(v2) return v2;
+  const v1=lj('timelog_active_v1');
+  if(v1) return [v1];
+  return [];
+})();
+
 let tab='home',period='today',toastMsg='',copied=false,toastT,copyT,tickT;
 
 const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 const saveCats=()=>sv('timelog_categories_v1',cats);
 const saveSess=()=>sv('timelog_sessions_v1',sessions);
-const saveAct=()=>active?sv('timelog_active_v1',active):localStorage.removeItem('timelog_active_v1');
+const saveActives=()=>sv('timelog_actives_v2',actives);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const getCat=id=>cats.find(c=>c.id===id)||{name:'不明',emoji:'❓',color:0};
 
@@ -198,13 +236,28 @@ function donutBg(totals){
 }
 
 function showToast(msg){toastMsg=msg;render();if(toastT)clearTimeout(toastT);toastT=setTimeout(()=>{toastMsg='';render();},2000);}
-function startTimer(id){active={id:uid(),categoryId:id,startedAt:new Date().toISOString()};saveAct();startTick();render();}
-function stopTimer(){
-  if(!active)return; stopTick();
-  const dur=Date.now()-new Date(active.startedAt).getTime();
-  if(dur>3000){sessions.push({id:active.id,categoryId:active.categoryId,startedAt:active.startedAt,endedAt:new Date().toISOString(),duration:dur});saveSess();showToast('記録しました！ '+fmtDur(dur));}
-  active=null;saveAct();render();
+
+function startTimer(id){
+  if(actives.find(a=>a.categoryId===id)){ showToast('すでに計測中だよ'); return; }
+  actives.push({id:uid(),categoryId:id,startedAt:new Date().toISOString()});
+  saveActives(); startTick(); render();
 }
+
+function stopTimer(activeId){
+  const entry=actives.find(a=>a.id===activeId);
+  if(!entry) return;
+  const dur=Date.now()-new Date(entry.startedAt).getTime();
+  if(dur>3000){
+    sessions.push({id:entry.id,categoryId:entry.categoryId,startedAt:entry.startedAt,endedAt:new Date().toISOString(),duration:dur});
+    saveSess();
+    showToast('記録しました！ '+fmtDur(dur));
+  }
+  actives=actives.filter(a=>a.id!==activeId);
+  saveActives();
+  if(!actives.length) stopTick();
+  render();
+}
+
 function delSess(id){sessions=sessions.filter(s=>s.id!==id);saveSess();render();}
 function addCat(){
   const e=(document.getElementById('ie')?.value.trim())||'⭐';
@@ -213,6 +266,7 @@ function addCat(){
   cats.push({id:uid(),name:n,emoji:e,color:cats.length%COLORS.length});saveCats();render();
 }
 function delCat(id){if(!confirm('このカテゴリを削除しますか？（記録は残ります）'))return;cats=cats.filter(c=>c.id!==id);saveCats();render();}
+
 function buildExp(){
   const now=new Date(),wAgo=new Date(Date.now()-7*864e5);
   const f=d=>(d.getMonth()+1)+'/'+d.getDate();
@@ -227,19 +281,25 @@ function buildExp(){
   return L.join('\n');
 }
 function copyExp(){navigator.clipboard.writeText(buildExp()).then(()=>{copied=true;render();showToast('✅ コピーしました');if(copyT)clearTimeout(copyT);copyT=setTimeout(()=>{copied=false;render();},2000);});}
+
 function tickUpdate(){
-  if(!active)return;
-  const el=document.getElementById('timer-num');
+  if(!actives.length) return;
+  const now=Date.now();
+  // 各タイマーの表示を更新
+  actives.forEach(a=>{
+    const el=document.getElementById('ar-timer-'+a.id);
+    if(el) el.textContent=fmtTimer(now-new Date(a.startedAt).getTime());
+  });
+  // ヘッダー合計
   const el2=document.getElementById('today-live');
-  const elapsed=Date.now()-new Date(active.startedAt).getTime();
-  if(el)el.textContent=fmtTimer(elapsed);
-  const td=sum(isToday),tm=totMs(isToday);
-  const live=tm+elapsed;
-  if(el2)el2.textContent=live<60000?'0分':fmtDur(live);
+  const td=totMs(isToday);
+  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
+  if(el2) el2.textContent=(td+liveExtra)<60000?'0分':fmtDur(td+liveExtra);
 }
 function startTick(){stopTick();tickT=setInterval(tickUpdate,1000);}
 function stopTick(){if(tickT){clearInterval(tickT);tickT=null;}}
-if(active)startTick();
+if(actives.length) startTick();
+
 function switchTab(t){tab=t;render();}
 function setPer(p){period=p;render();}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -260,8 +320,11 @@ function render(){
   const fn=period==='today'?isToday:isWeek;
   const hl=period==='today'?'今日':'今週';
   const td=sum(isToday),tm=totMs(isToday);
-  const live=tm+(active?Date.now()-new Date(active.startedAt).getTime():0);
+  const now=Date.now();
+  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
+  const live=tm+liveExtra;
   const hd=sum(fn),hm=totMs(fn);
+  const runningIds=new Set(actives.map(a=>a.categoryId));
 
   let h=`<div class="header">
 <div class="mascot">${PONZU}</div>
@@ -271,27 +334,50 @@ function render(){
 
   if(tab==='home'){
     h+=`<div class="tab">`;
-    if(active){
-      const c=getCat(active.categoryId);
-      const el=Date.now()-new Date(active.startedAt).getTime();
-      h+=`<div class="card active-card">
-<div class="active-pill zm">${c.emoji} ${esc(c.name)}</div>
-<div class="ring-wrap"><div class="ring-base"></div><div class="ring-arc"></div><div class="ring-pulse"></div>
-<div class="ring-inner"><div class="timer-num zm" id="timer-num">${fmtTimer(el)}</div><div class="watching">🐾 ぽんず見守り中</div></div></div>
-<button class="stop-btn" onclick="stopTimer()">■ 停止</button>
+
+    // ── アクティブタイマー一覧 ──
+    if(actives.length){
+      h+=`<div class="active-list">`;
+      actives.forEach(a=>{
+        const c=getCat(a.categoryId);
+        const elapsed=now-new Date(a.startedAt).getTime();
+        const accentColor=col(c.color).val;
+        h+=`<div class="active-row" style="--accent-color:${accentColor}">
+  <span class="ar-emoji">${c.emoji}</span>
+  <div class="ar-info">
+    <div class="ar-name zm">${esc(c.name)}</div>
+    <div class="ar-timer" id="ar-timer-${a.id}" style="color:${accentColor}">${fmtTimer(elapsed)}</div>
+  </div>
+  <button class="ar-stop" onclick="stopTimer('${a.id}')">■ 停止</button>
 </div>`;
-    } else {
-      h+=`<div class="card" style="text-align:center"><p style="color:#888B7E;font-size:14px;margin-bottom:16px">カテゴリを選んで計測を開始</p>
-<div class="chips">${cats.map(c=>`<button class="chip" onclick="startTimer('${c.id}')"><span style="font-size:18px">${c.emoji}</span>${esc(c.name)}</button>`).join('')}</div></div>`;
+      });
+      h+=`</div>`;
     }
+
+    // ── カテゴリ選択チップ ──
+    h+=`<div class="card" style="text-align:center">
+<p style="color:#888B7E;font-size:14px;margin-bottom:16px">${actives.length?'別のカテゴリも同時に計測できるよ':'カテゴリを選んで計測を開始'}</p>
+<div class="chips">${cats.map(c=>{
+  const running=runningIds.has(c.id);
+  return`<button class="chip${running?' running':''}" onclick="${running?'showToast(\'すでに計測中だよ\')':'startTimer(\''+c.id+'\')'}">${c.emoji} ${esc(c.name)}${running?' ▶':''}</button>`;
+}).join('')}</div></div>`;
+
+    // ── 今日の内訳 ──
     h+=`<div class="sec-title zm">今日の内訳</div>`;
-    const tb=cats.filter(c=>td[c.id]);
+    // アクティブ分を含めた暫定合計で表示
+    const tdLive={...td};
+    actives.forEach(a=>{
+      const elapsed=now-new Date(a.startedAt).getTime();
+      tdLive[a.categoryId]=(tdLive[a.categoryId]||0)+elapsed;
+    });
+    const tb=cats.filter(c=>tdLive[c.id]);
+    const tmLive=tm+liveExtra;
     if(!tb.length){
       h+=`<div class="empty">今日の記録はまだありません<br><span style="font-size:24px;display:inline-block;margin-top:8px">🐶</span></div>`;
     } else {
       h+=`<div class="card-sm donut-wrap">
-<div class="donut zm" style="background:${donutBg(td)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tm>=60000?fmtDur(tm):'0分'}</div></div></div>
-<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(td[c.id])}</span></div>`).join('')}</div>
+<div class="donut zm" style="background:${donutBg(tdLive)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tmLive>=60000?fmtDur(tmLive):'0分'}</div></div></div>
+<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(tdLive[c.id])}</span></div>`).join('')}</div>
 </div>`;
     }
     h+=`</div>`;
@@ -340,4 +426,3 @@ render();
 </script>
 </body>
 </html>
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
