@@ -28,9 +28,9 @@ body {
 @keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.06);opacity:1} }
 @keyframes pulsering { 0%{transform:scale(.78);opacity:.5} 100%{transform:scale(1.5);opacity:0} }
 @keyframes sleepbob { 0%,100%{transform:translateY(0) rotate(-1.5deg)} 50%{transform:translateY(-2px) rotate(1.5deg)} }
+@keyframes barfill { from { width: 4% } }
 @keyframes toastin { from{opacity:0;transform:translate(-50%,8px)} to{opacity:1;transform:translate(-50%,0)} }
 @keyframes fadeup { from{transform:translateY(7px);opacity:0} to{transform:translateY(0);opacity:1} }
-@keyframes slidedown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 
 .header { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
 .mascot { width:50px; height:50px; border-radius:50%; background:#E4EFE3; display:flex; align-items:center; justify-content:center; flex:none; }
@@ -55,35 +55,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .chip:active { transform:scale(.94); border-color:#7FA889; background:#E4EFE3; }
-.chip.running {
-  border-color:#7FA889; background:#E4EFE3; color:#5e8a69;
-  opacity:.6; cursor:not-allowed;
-}
 
-/* ── 複数アクティブタイマー ── */
-.active-list { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
-.active-row {
-  background:#fff; border-radius:16px;
-  padding:14px 16px;
-  box-shadow:0 4px 18px rgba(48,50,45,.08);
-  display:flex; align-items:center; gap:12px;
-  animation:slidedown .25s ease;
-  border-left:4px solid var(--accent-color, #7FA889);
-}
-.ar-emoji { font-size:24px; flex:none; }
-.ar-info { flex:1; min-width:0; }
-.ar-name { font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700; }
-.ar-timer { font-family:'Zen Maru Gothic',sans-serif; font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.03em; color:#7FA889; }
-.ar-stop {
-  background:#EFA888; color:#fff; border:none; border-radius:999px;
-  padding:8px 16px; font-size:13px; font-weight:700;
-  font-family:'Zen Maru Gothic',sans-serif; cursor:pointer;
-  flex:none; transition:opacity .15s;
-  -webkit-tap-highlight-color:transparent;
-}
-.ar-stop:active { opacity:.8; }
-
-/* 既存の単一タイマー UI（並走なしのとき） */
 .active-card { text-align:center; }
 .active-pill {
   display:inline-flex; align-items:center; gap:7px;
@@ -138,6 +110,7 @@ body {
 .sess-time { color:#888B7E; }
 .sess-dur  { font-weight:700; min-width:48px; text-align:right; }
 .sess-del  { color:#b5b8ac; background:none; border:none; cursor:pointer; font-size:16px; padding:0 0 0 4px; }
+.sess-date { font-size:11px; color:#b5b8ac; margin-bottom:4px; margin-top:12px; font-weight:700; letter-spacing:.05em; }
 
 .cat-item {
   display:flex; align-items:center; gap:11px;
@@ -181,10 +154,11 @@ body {
   animation:toastin .3s ease; pointer-events:none;
 }
 .tab { animation:fadeup .3s ease; }
+.idb-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; color:#7FA889; font-weight:700; background:#E4EFE3; border-radius:999px; padding:2px 8px; margin-left:6px; vertical-align:middle; }
 </style>
 </head>
 <body>
-<div class="app" id="app"></div>
+<div class="app" id="app"><div style="text-align:center;padding:80px 0;color:#a7aa9c">読み込み中...</div></div>
 <script>
 const COLORS=[
   {val:'#7FA889',soft:'#E4EFE3'},
@@ -204,33 +178,84 @@ function defCats(){return[
   {id:'5',name:'休憩',emoji:'☕',color:4},
 ];}
 
+// ── IndexedDB ──────────────────────────────────────────
+const DB_NAME='ponzu-timelog-db', DB_VER=1;
+let db;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{
+      const d=e.target.result;
+      if(!d.objectStoreNames.contains('sessions')){
+        const s=d.createObjectStore('sessions',{keyPath:'id'});
+        s.createIndex('startedAt','startedAt',{unique:false});
+      }
+    };
+    req.onsuccess=e=>{db=e.target.result;res(db);};
+    req.onerror=e=>rej(e);
+  });
+}
+
+function idbGetAll(){
+  return new Promise(res=>{
+    const tx=db.transaction('sessions','readonly');
+    const req=tx.objectStore('sessions').getAll();
+    req.onsuccess=()=>res(req.result||[]);
+    req.onerror=()=>res([]);
+  });
+}
+
+function idbPut(session){
+  return new Promise(res=>{
+    const tx=db.transaction('sessions','readwrite');
+    tx.objectStore('sessions').put(session);
+    tx.oncomplete=res;
+  });
+}
+
+function idbDelete(id){
+  return new Promise(res=>{
+    const tx=db.transaction('sessions','readwrite');
+    tx.objectStore('sessions').delete(id);
+    tx.oncomplete=res;
+  });
+}
+
+// ── localStorage (categories & active timer) ──────────
 const lj=k=>{try{return JSON.parse(localStorage.getItem(k))||null}catch{return null}};
-let cats=lj('timelog_categories_v1')||defCats();
-let sessions=lj('timelog_sessions_v1')||[];
-
-// v2: actives は配列。旧 active（単一）との互換移行
-let actives=(()=>{
-  const v2=lj('timelog_actives_v2');
-  if(v2) return v2;
-  const v1=lj('timelog_active_v1');
-  if(v1) return [v1];
-  return [];
-})();
-
-let tab='home',period='today',toastMsg='',copied=false,toastT,copyT,tickT;
-
 const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+let cats=lj('timelog_categories_v1')||defCats();
+let active=lj('timelog_active_v1')||null;
 const saveCats=()=>sv('timelog_categories_v1',cats);
-const saveSess=()=>sv('timelog_sessions_v1',sessions);
-const saveActives=()=>sv('timelog_actives_v2',actives);
+const saveAct=()=>active?sv('timelog_active_v1',active):localStorage.removeItem('timelog_active_v1');
+
+// ── In-memory sessions ────────────────────────────────
+let sessions=[];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const getCat=id=>cats.find(c=>c.id===id)||{name:'不明',emoji:'❓',color:0};
 
+// ── Migration from localStorage ───────────────────────
+async function migrate(){
+  const ls=lj('timelog_sessions_v1');
+  if(ls&&ls.length>0){
+    const existing=await idbGetAll();
+    if(existing.length===0){
+      for(const s of ls) await idbPut(s);
+    }
+    localStorage.removeItem('timelog_sessions_v1');
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────
 function fmtDur(ms){const m=Math.floor(ms/60000),h=Math.floor(m/60);return h>0?h+'h'+String(m%60).padStart(2,'0')+'m':m+'m';}
 function fmtTimer(ms){const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);return String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0');}
 function fmtTime(iso){const d=new Date(iso);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function fmtDate(iso){const d=new Date(iso);return(d.getMonth()+1)+'/'+d.getDate()+'（'+['日','月','火','水','木','金','土'][d.getDay()]+'）';}
 const isToday=iso=>new Date(iso).toLocaleDateString('ja-JP')===new Date().toLocaleDateString('ja-JP');
 const isWeek=iso=>{const d=Date.now()-new Date(iso).getTime();return d>=0&&d<7*864e5;};
+const isAll=()=>true;
+
 function sum(fn){const t={};sessions.filter(s=>fn(s.startedAt)).forEach(s=>{t[s.categoryId]=(t[s.categoryId]||0)+s.duration});return t;}
 function totMs(fn){return sessions.filter(s=>fn(s.startedAt)).reduce((a,s)=>a+s.duration,0);}
 function donutBg(totals){
@@ -241,30 +266,32 @@ function donutBg(totals){
   return'conic-gradient('+entries.map(e=>{const st=(acc/s*100).toFixed(2);acc+=e.ms;return col(e.c.color).val+' '+st+'% '+(acc/s*100).toFixed(2)+'%';}).join(',')+')';
 }
 
+// ── State ─────────────────────────────────────────────
+let tab='home',period='today',toastMsg='',copied=false,toastT,copyT,tickT;
+
+// ── Actions ───────────────────────────────────────────
 function showToast(msg){toastMsg=msg;render();if(toastT)clearTimeout(toastT);toastT=setTimeout(()=>{toastMsg='';render();},2000);}
 
-function startTimer(id){
-  if(actives.find(a=>a.categoryId===id)){ showToast('すでに計測中だよ'); return; }
-  actives.push({id:uid(),categoryId:id,startedAt:new Date().toISOString()});
-  saveActives(); startTick(); render();
-}
+function startTimer(id){active={id:uid(),categoryId:id,startedAt:new Date().toISOString()};saveAct();startTick();render();}
 
-function stopTimer(activeId){
-  const entry=actives.find(a=>a.id===activeId);
-  if(!entry) return;
-  const dur=Date.now()-new Date(entry.startedAt).getTime();
+async function stopTimer(){
+  if(!active)return; stopTick();
+  const dur=Date.now()-new Date(active.startedAt).getTime();
   if(dur>3000){
-    sessions.push({id:entry.id,categoryId:entry.categoryId,startedAt:entry.startedAt,endedAt:new Date().toISOString(),duration:dur});
-    saveSess();
+    const s={id:active.id,categoryId:active.categoryId,startedAt:active.startedAt,endedAt:new Date().toISOString(),duration:dur};
+    sessions.push(s);
+    await idbPut(s);
     showToast('記録しました！ '+fmtDur(dur));
   }
-  actives=actives.filter(a=>a.id!==activeId);
-  saveActives();
-  if(!actives.length) stopTick();
+  active=null;saveAct();render();
+}
+
+async function delSess(id){
+  sessions=sessions.filter(s=>s.id!==id);
+  await idbDelete(id);
   render();
 }
 
-function delSess(id){sessions=sessions.filter(s=>s.id!==id);saveSess();render();}
 function addCat(){
   const e=(document.getElementById('ie')?.value.trim())||'⭐';
   const n=document.getElementById('in')?.value.trim();
@@ -276,7 +303,7 @@ function delCat(id){if(!confirm('このカテゴリを削除しますか？（�
 function buildExp(){
   const now=new Date(),wAgo=new Date(Date.now()-7*864e5);
   const f=d=>(d.getMonth()+1)+'/'+d.getDate();
-  const tt=sum(isToday),wt=sum(isWeek),tm=totMs(isToday),wm=totMs(isWeek);
+  const tt=sum(isToday),wt=sum(isWeek),at=sum(isAll),tm=totMs(isToday),wm=totMs(isWeek),am=totMs(isAll);
   const L=['【ぽんず時間ログ】'+f(now),'','▼ 今日'];
   cats.filter(c=>tt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(tt[c.id])));
   if(!Object.keys(tt).length)L.push('  記録なし');
@@ -284,32 +311,34 @@ function buildExp(){
   cats.filter(c=>wt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(wt[c.id])));
   if(!Object.keys(wt).length)L.push('  記録なし');
   L.push('  合計: '+(wm>0?fmtDur(wm):'0分'));
+  if(am>wm){
+    L.push('','▼ 全期間累計');
+    cats.filter(c=>at[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(at[c.id])));
+    L.push('  合計: '+fmtDur(am));
+  }
   return L.join('\n');
 }
+
 function copyExp(){navigator.clipboard.writeText(buildExp()).then(()=>{copied=true;render();showToast('✅ コピーしました');if(copyT)clearTimeout(copyT);copyT=setTimeout(()=>{copied=false;render();},2000);});}
 
 function tickUpdate(){
-  if(!actives.length) return;
-  const now=Date.now();
-  // 各タイマーの表示を更新
-  actives.forEach(a=>{
-    const el=document.getElementById('ar-timer-'+a.id);
-    if(el) el.textContent=fmtTimer(now-new Date(a.startedAt).getTime());
-  });
-  // ヘッダー合計
+  if(!active)return;
+  const el=document.getElementById('timer-num');
   const el2=document.getElementById('today-live');
-  const td=totMs(isToday);
-  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
-  if(el2) el2.textContent=(td+liveExtra)<60000?'0分':fmtDur(td+liveExtra);
+  const elapsed=Date.now()-new Date(active.startedAt).getTime();
+  if(el)el.textContent=fmtTimer(elapsed);
+  const td=sum(isToday),tm=totMs(isToday);
+  const live=tm+elapsed;
+  if(el2)el2.textContent=live<60000?'0分':fmtDur(live);
 }
 function startTick(){stopTick();tickT=setInterval(tickUpdate,1000);}
 function stopTick(){if(tickT){clearInterval(tickT);tickT=null;}}
-if(actives.length) startTick();
 
 function switchTab(t){tab=t;render();}
 function setPer(p){period=p;render();}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+// ── SVGs ──────────────────────────────────────────────
 const PONZU=`<svg viewBox="0 0 64 64" style="width:44px;height:44px;overflow:visible">
 <ellipse cx="14" cy="38" rx="10" ry="13" fill="#fff"/><ellipse cx="50" cy="38" rx="10" ry="13" fill="#fff"/>
 <circle cx="22" cy="20" r="11" fill="#fff"/><circle cx="42" cy="20" r="11" fill="#fff"/><circle cx="32" cy="15" r="12" fill="#fff"/>
@@ -322,84 +351,79 @@ const PONZU=`<svg viewBox="0 0 64 64" style="width:44px;height:44px;overflow:vis
 </svg>`;
 const NOAH=`<svg viewBox="0 0 64 64" style="width:22px;height:22px;overflow:visible"><ellipse cx="32" cy="27" rx="11" ry="13" fill="#cfcabd"/><path d="M21 28 q0-16 11-16 q11 0 11 16 q-3.5-8-11-8 q-7.5 0-11 8 z" fill="#8a8779"/><ellipse cx="28" cy="29" rx="1.3" ry="1.7" fill="#fff"/><ellipse cx="36" cy="29" rx="1.3" ry="1.7" fill="#fff"/></svg>`;
 
+// ── Render ────────────────────────────────────────────
 function render(){
-  const fn=period==='today'?isToday:isWeek;
-  const hl=period==='today'?'今日':'今週';
+  const filterFn=period==='today'?isToday:period==='week'?isWeek:isAll;
+  const hl=period==='today'?'今日':period==='week'?'今週':'全期間';
   const td=sum(isToday),tm=totMs(isToday);
-  const now=Date.now();
-  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
-  const live=tm+liveExtra;
-  const hd=sum(fn),hm=totMs(fn);
-  const runningIds=new Set(actives.map(a=>a.categoryId));
+  const live=tm+(active?Date.now()-new Date(active.startedAt).getTime():0);
+  const hd=sum(filterFn),hm=totMs(filterFn);
 
   let h=`<div class="header">
 <div class="mascot">${PONZU}</div>
-<div class="zm"><div class="h-sub">PONZU TIME LOG</div><div class="h-main">ぽんず時間ログ</div></div>
+<div class="zm"><div class="h-sub">PONZU TIME LOG <span class="idb-badge">💾 IDB</span></div><div class="h-main">ぽんず時間ログ</div></div>
 <div class="h-total zm"><div class="h-total-lbl">今日の合計</div><div class="h-total-val" id="today-live">${live<60000?'0分':fmtDur(live)}</div></div>
 </div>`;
 
   if(tab==='home'){
     h+=`<div class="tab">`;
-
-    // ── アクティブタイマー一覧 ──
-    if(actives.length){
-      h+=`<div class="active-list">`;
-      actives.forEach(a=>{
-        const c=getCat(a.categoryId);
-        const elapsed=now-new Date(a.startedAt).getTime();
-        const accentColor=col(c.color).val;
-        h+=`<div class="active-row" style="--accent-color:${accentColor}">
-  <span class="ar-emoji">${c.emoji}</span>
-  <div class="ar-info">
-    <div class="ar-name zm">${esc(c.name)}</div>
-    <div class="ar-timer" id="ar-timer-${a.id}" style="color:${accentColor}">${fmtTimer(elapsed)}</div>
-  </div>
-  <button class="ar-stop" onclick="stopTimer('${a.id}')">■ 停止</button>
+    if(active){
+      const c=getCat(active.categoryId);
+      const el=Date.now()-new Date(active.startedAt).getTime();
+      h+=`<div class="card active-card">
+<div class="active-pill zm">${c.emoji} ${esc(c.name)}</div>
+<div class="ring-wrap"><div class="ring-base"></div><div class="ring-arc"></div><div class="ring-pulse"></div>
+<div class="ring-inner"><div class="timer-num zm" id="timer-num">${fmtTimer(el)}</div><div class="watching">🐾 ぽんず見守り中</div></div></div>
+<button class="stop-btn" onclick="stopTimer()">■ 停止</button>
 </div>`;
-      });
-      h+=`</div>`;
+    } else {
+      h+=`<div class="card" style="text-align:center"><p style="color:#888B7E;font-size:14px;margin-bottom:16px">カテゴリを選んで計測を開始</p>
+<div class="chips">${cats.map(c=>`<button class="chip" onclick="startTimer('${c.id}')"><span style="font-size:18px">${c.emoji}</span>${esc(c.name)}</button>`).join('')}</div></div>`;
     }
-
-    // ── カテゴリ選択チップ ──
-    h+=`<div class="card" style="text-align:center">
-<p style="color:#888B7E;font-size:14px;margin-bottom:16px">${actives.length?'別のカテゴリも同時に計測できるよ':'カテゴリを選んで計測を開始'}</p>
-<div class="chips">${cats.map(c=>{
-  const running=runningIds.has(c.id);
-  return`<button class="chip${running?' running':''}" onclick="${running?'showToast(\'すでに計測中だよ\')':'startTimer(\''+c.id+'\')'}">${c.emoji} ${esc(c.name)}${running?' ▶':''}</button>`;
-}).join('')}</div></div>`;
-
-    // ── 今日の内訳 ──
     h+=`<div class="sec-title zm">今日の内訳</div>`;
-    // アクティブ分を含めた暫定合計で表示
-    const tdLive={...td};
-    actives.forEach(a=>{
-      const elapsed=now-new Date(a.startedAt).getTime();
-      tdLive[a.categoryId]=(tdLive[a.categoryId]||0)+elapsed;
-    });
-    const tb=cats.filter(c=>tdLive[c.id]);
-    const tmLive=tm+liveExtra;
+    const tb=cats.filter(c=>td[c.id]);
     if(!tb.length){
       h+=`<div class="empty">今日の記録はまだありません<br><span style="font-size:24px;display:inline-block;margin-top:8px">🐶</span></div>`;
     } else {
       h+=`<div class="card-sm donut-wrap">
-<div class="donut zm" style="background:${donutBg(tdLive)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tmLive>=60000?fmtDur(tmLive):'0分'}</div></div></div>
-<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(tdLive[c.id])}</span></div>`).join('')}</div>
+<div class="donut zm" style="background:${donutBg(td)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tm>=60000?fmtDur(tm):'0分'}</div></div></div>
+<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(td[c.id])}</span></div>`).join('')}</div>
 </div>`;
     }
     h+=`</div>`;
   }
   else if(tab==='history'){
     const hb=cats.filter(c=>hd[c.id]);
-    const hs=[...sessions].filter(s=>fn(s.startedAt)).reverse();
+    // Group sessions by date for "全期間" view
+    const filteredSess=[...sessions].filter(s=>filterFn(s.startedAt)).reverse();
     h+=`<div class="tab">
-<div class="period-row"><button class="per-btn${period==='today'?' on':''}" onclick="setPer('today')">今日</button><button class="per-btn${period==='week'?' on':''}" onclick="setPer('week')">今週</button></div>
+<div class="period-row">
+  <button class="per-btn${period==='today'?' on':''}" onclick="setPer('today')">今日</button>
+  <button class="per-btn${period==='week'?' on':''}" onclick="setPer('week')">今週</button>
+  <button class="per-btn${period==='all'?' on':''}" onclick="setPer('all')">全期間</button>
+</div>
 <div class="card" style="text-align:center;margin-bottom:8px">
 <div class="hist-donut zm" style="background:${donutBg(hd)}"><div class="hist-hole"><div class="hh-lbl">${hl}の合計</div><div class="hh-val">${hm>0?fmtDur(hm):'0分'}</div></div></div>
 <div class="hlegend">${hb.map(c=>`<div class="hl-row"><span class="hl-chip" style="background:${col(c.color).val}"></span>${c.emoji} ${esc(c.name)} <b>${fmtDur(hd[c.id])}</b></div>`).join('')}</div>
 </div>
 <div class="sec-title zm">${hl}のセッション</div>`;
-    if(!hs.length)h+=`<div style="text-align:center;color:#a7aa9c;font-size:14px;padding:24px 0">記録がありません</div>`;
-    else h+=hs.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
+    if(!filteredSess.length){
+      h+=`<div style="text-align:center;color:#a7aa9c;font-size:14px;padding:24px 0">記録がありません</div>`;
+    } else if(period==='all'){
+      // Group by date
+      const byDate={};
+      filteredSess.forEach(s=>{
+        const dk=new Date(s.startedAt).toLocaleDateString('ja-JP');
+        if(!byDate[dk])byDate[dk]={label:fmtDate(s.startedAt),sessions:[]};
+        byDate[dk].sessions.push(s);
+      });
+      Object.values(byDate).forEach(g=>{
+        h+=`<div class="sess-date">${g.label}</div>`;
+        h+=g.sessions.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
+      });
+    } else {
+      h+=filteredSess.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
+    }
     h+=`</div>`;
   }
   else if(tab==='settings'){
@@ -428,7 +452,15 @@ ${cats.map(c=>`<div class="cat-item" style="border-left:3px solid ${col(c.color)
   if(toastMsg)h+=`<div class="toast">${esc(toastMsg)}</div>`;
   document.getElementById('app').innerHTML=h;
 }
-render();
+
+// ── Init ──────────────────────────────────────────────
+(async()=>{
+  await openDB();
+  await migrate();
+  sessions=await idbGetAll();
+  if(active)startTick();
+  render();
+})();
 </script>
 </body>
 </html>
