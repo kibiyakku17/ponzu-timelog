@@ -55,6 +55,31 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .chip:active { transform:scale(.94); border-color:#7FA889; background:#E4EFE3; }
+.chip.running {
+  border-color:#7FA889; background:#E4EFE3; color:#5e8a69;
+  opacity:.6; cursor:not-allowed;
+}
+
+@keyframes slidedown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+.active-list { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+.active-row {
+  background:#fff; border-radius:16px; padding:14px 16px;
+  box-shadow:0 4px 18px rgba(48,50,45,.08);
+  display:flex; align-items:center; gap:12px;
+  animation:slidedown .25s ease;
+  border-left:4px solid var(--accent-color, #7FA889);
+}
+.ar-emoji { font-size:24px; flex:none; }
+.ar-info { flex:1; min-width:0; }
+.ar-name { font-family:'Zen Maru Gothic',sans-serif; font-size:14px; font-weight:700; }
+.ar-timer { font-family:'Zen Maru Gothic',sans-serif; font-size:22px; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:.03em; }
+.ar-stop {
+  background:#EFA888; color:#fff; border:none; border-radius:999px;
+  padding:8px 16px; font-size:13px; font-weight:700;
+  font-family:'Zen Maru Gothic',sans-serif; cursor:pointer;
+  flex:none; transition:opacity .15s; -webkit-tap-highlight-color:transparent;
+}
+.ar-stop:active { opacity:.8; }
 
 .active-card { text-align:center; }
 .active-pill {
@@ -226,9 +251,15 @@ function idbDelete(id){
 const lj=k=>{try{return JSON.parse(localStorage.getItem(k))||null}catch{return null}};
 const sv=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
 let cats=lj('timelog_categories_v1')||defCats();
-let active=lj('timelog_active_v1')||null;
+let actives=(()=>{
+  const v2=lj('timelog_actives_v2');
+  if(v2) return v2;
+  const v1=lj('timelog_active_v1');
+  if(v1) return [v1];
+  return [];
+})();
 const saveCats=()=>sv('timelog_categories_v1',cats);
-const saveAct=()=>active?sv('timelog_active_v1',active):localStorage.removeItem('timelog_active_v1');
+const saveActives=()=>sv('timelog_actives_v2',actives);
 
 // ── In-memory sessions ────────────────────────────────
 let sessions=[];
@@ -267,23 +298,31 @@ function donutBg(totals){
 }
 
 // ── State ─────────────────────────────────────────────
-let tab='home',period='today',toastMsg='',copied=false,toastT,copyT,tickT;
+let tab='home',period='today',toastMsg='',copied=false,expDate=new Date().toISOString().split('T')[0],toastT,copyT,tickT;
 
 // ── Actions ───────────────────────────────────────────
 function showToast(msg){toastMsg=msg;render();if(toastT)clearTimeout(toastT);toastT=setTimeout(()=>{toastMsg='';render();},2000);}
 
-function startTimer(id){active={id:uid(),categoryId:id,startedAt:new Date().toISOString()};saveAct();startTick();render();}
+function startTimer(id){
+  if(actives.find(a=>a.categoryId===id)){showToast('すでに計測中だよ');return;}
+  actives.push({id:uid(),categoryId:id,startedAt:new Date().toISOString()});
+  saveActives();startTick();render();
+}
 
-async function stopTimer(){
-  if(!active)return; stopTick();
-  const dur=Date.now()-new Date(active.startedAt).getTime();
+async function stopTimer(activeId){
+  const entry=actives.find(a=>a.id===activeId);
+  if(!entry)return;
+  const dur=Date.now()-new Date(entry.startedAt).getTime();
   if(dur>3000){
-    const s={id:active.id,categoryId:active.categoryId,startedAt:active.startedAt,endedAt:new Date().toISOString(),duration:dur};
+    const s={id:entry.id,categoryId:entry.categoryId,startedAt:entry.startedAt,endedAt:new Date().toISOString(),duration:dur};
     sessions.push(s);
     await idbPut(s);
     showToast('記録しました！ '+fmtDur(dur));
   }
-  active=null;saveAct();render();
+  actives=actives.filter(a=>a.id!==activeId);
+  saveActives();
+  if(!actives.length)stopTick();
+  render();
 }
 
 async function delSess(id){
@@ -300,14 +339,20 @@ function addCat(){
 }
 function delCat(id){if(!confirm('このカテゴリを削除しますか？（記録は残ります）'))return;cats=cats.filter(c=>c.id!==id);saveCats();render();}
 
+function setExpDate(d){expDate=d;render();}
+
 function buildExp(){
-  const now=new Date(),wAgo=new Date(Date.now()-7*864e5);
+  const target=expDate?new Date(expDate+'T00:00:00'):new Date();
+  const isTgt=iso=>new Date(iso).toLocaleDateString('ja-JP')===target.toLocaleDateString('ja-JP');
+  const wStart=new Date(target);wStart.setDate(target.getDate()-6);
+  const isWk=iso=>{const d=new Date(iso);return d>=wStart&&d<=new Date(target.getFullYear(),target.getMonth(),target.getDate(),23,59,59);};
   const f=d=>(d.getMonth()+1)+'/'+d.getDate();
-  const tt=sum(isToday),wt=sum(isWeek),at=sum(isAll),tm=totMs(isToday),wm=totMs(isWeek),am=totMs(isAll);
-  const L=['【ぽんず時間ログ】'+f(now),'','▼ 今日'];
+  const dayLabel=f(target)+'（'+['日','月','火','水','木','金','土'][target.getDay()]+'）';
+  const tt=sum(isTgt),wt=sum(isWk),at=sum(isAll),tm=totMs(isTgt),wm=totMs(isWk),am=totMs(isAll);
+  const L=['【ぽんず時間ログ】'+f(target),'','▼ '+dayLabel];
   cats.filter(c=>tt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(tt[c.id])));
   if(!Object.keys(tt).length)L.push('  記録なし');
-  L.push('  合計: '+(tm>0?fmtDur(tm):'0分'),'','▼ 今週（'+f(wAgo)+'〜'+f(now)+'）');
+  L.push('  合計: '+(tm>0?fmtDur(tm):'0分'),'','▼ 今週（'+f(wStart)+'〜'+f(target)+'）');
   cats.filter(c=>wt[c.id]).forEach(c=>L.push('  '+c.emoji+' '+c.name+': '+fmtDur(wt[c.id])));
   if(!Object.keys(wt).length)L.push('  記録なし');
   L.push('  合計: '+(wm>0?fmtDur(wm):'0分'));
@@ -322,14 +367,15 @@ function buildExp(){
 function copyExp(){navigator.clipboard.writeText(buildExp()).then(()=>{copied=true;render();showToast('✅ コピーしました');if(copyT)clearTimeout(copyT);copyT=setTimeout(()=>{copied=false;render();},2000);});}
 
 function tickUpdate(){
-  if(!active)return;
-  const el=document.getElementById('timer-num');
+  if(!actives.length)return;
+  const now=Date.now();
+  actives.forEach(a=>{
+    const el=document.getElementById('ar-timer-'+a.id);
+    if(el)el.textContent=fmtTimer(now-new Date(a.startedAt).getTime());
+  });
   const el2=document.getElementById('today-live');
-  const elapsed=Date.now()-new Date(active.startedAt).getTime();
-  if(el)el.textContent=fmtTimer(elapsed);
-  const td=sum(isToday),tm=totMs(isToday);
-  const live=tm+elapsed;
-  if(el2)el2.textContent=live<60000?'0分':fmtDur(live);
+  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
+  if(el2)el2.textContent=(totMs(isToday)+liveExtra)<60000?'0分':fmtDur(totMs(isToday)+liveExtra);
 }
 function startTick(){stopTick();tickT=setInterval(tickUpdate,1000);}
 function stopTick(){if(tickT){clearInterval(tickT);tickT=null;}}
@@ -356,8 +402,11 @@ function render(){
   const filterFn=period==='today'?isToday:period==='week'?isWeek:isAll;
   const hl=period==='today'?'今日':period==='week'?'今週':'全期間';
   const td=sum(isToday),tm=totMs(isToday);
-  const live=tm+(active?Date.now()-new Date(active.startedAt).getTime():0);
+  const now=Date.now();
+  const liveExtra=actives.reduce((s,a)=>s+(now-new Date(a.startedAt).getTime()),0);
+  const live=tm+liveExtra;
   const hd=sum(filterFn),hm=totMs(filterFn);
+  const runningIds=new Set(actives.map(a=>a.categoryId));
 
   let h=`<div class="header">
 <div class="mascot">${PONZU}</div>
@@ -367,27 +416,33 @@ function render(){
 
   if(tab==='home'){
     h+=`<div class="tab">`;
-    if(active){
-      const c=getCat(active.categoryId);
-      const el=Date.now()-new Date(active.startedAt).getTime();
-      h+=`<div class="card active-card">
-<div class="active-pill zm">${c.emoji} ${esc(c.name)}</div>
-<div class="ring-wrap"><div class="ring-base"></div><div class="ring-arc"></div><div class="ring-pulse"></div>
-<div class="ring-inner"><div class="timer-num zm" id="timer-num">${fmtTimer(el)}</div><div class="watching">🐾 ぽんず見守り中</div></div></div>
-<button class="stop-btn" onclick="stopTimer()">■ 停止</button>
+    if(actives.length){
+      h+=`<div class="active-list">`;
+      actives.forEach(a=>{
+        const c=getCat(a.categoryId);
+        const elapsed=now-new Date(a.startedAt).getTime();
+        const accentColor=col(c.color).val;
+        h+=`<div class="active-row" style="--accent-color:${accentColor}">
+<span class="ar-emoji">${c.emoji}</span>
+<div class="ar-info"><div class="ar-name zm">${esc(c.name)}</div><div class="ar-timer" id="ar-timer-${a.id}" style="color:${accentColor}">${fmtTimer(elapsed)}</div></div>
+<button class="ar-stop" onclick="stopTimer('${a.id}')">■ 停止</button>
 </div>`;
-    } else {
-      h+=`<div class="card" style="text-align:center"><p style="color:#888B7E;font-size:14px;margin-bottom:16px">カテゴリを選んで計測を開始</p>
-<div class="chips">${cats.map(c=>`<button class="chip" onclick="startTimer('${c.id}')"><span style="font-size:18px">${c.emoji}</span>${esc(c.name)}</button>`).join('')}</div></div>`;
+      });
+      h+=`</div>`;
     }
+    h+=`<div class="card" style="text-align:center"><p style="color:#888B7E;font-size:14px;margin-bottom:16px">${actives.length?'別のカテゴリも同時に計測できるよ':'カテゴリを選んで計測を開始'}</p>
+<div class="chips">${cats.map(c=>{const running=runningIds.has(c.id);return`<button class="chip${running?' running':''}" onclick="${running?`showToast('すでに計測中だよ')`:`startTimer('${c.id}')`}"><span style="font-size:18px">${c.emoji}</span>${esc(c.name)}${running?' ▶':''}</button>`;}).join('')}</div></div>`;
     h+=`<div class="sec-title zm">今日の内訳</div>`;
-    const tb=cats.filter(c=>td[c.id]);
+    const tdLive={...td};
+    actives.forEach(a=>{const elapsed=now-new Date(a.startedAt).getTime();tdLive[a.categoryId]=(tdLive[a.categoryId]||0)+elapsed;});
+    const tb=cats.filter(c=>tdLive[c.id]);
+    const tmLive=tm+liveExtra;
     if(!tb.length){
       h+=`<div class="empty">今日の記録はまだありません<br><span style="font-size:24px;display:inline-block;margin-top:8px">🐶</span></div>`;
     } else {
       h+=`<div class="card-sm donut-wrap">
-<div class="donut zm" style="background:${donutBg(td)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tm>=60000?fmtDur(tm):'0分'}</div></div></div>
-<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(td[c.id])}</span></div>`).join('')}</div>
+<div class="donut zm" style="background:${donutBg(tdLive)}"><div class="donut-hole"><div class="dh-lbl">今日</div><div class="dh-val">${tmLive>=60000?fmtDur(tmLive):'0分'}</div></div></div>
+<div class="legend">${tb.map(c=>`<div class="legend-row"><span class="l-chip" style="background:${col(c.color).val}"></span><span style="font-size:15px">${c.emoji}</span><span>${esc(c.name)}</span><span class="l-dur">${fmtDur(tdLive[c.id])}</span></div>`).join('')}</div>
 </div>`;
     }
     h+=`</div>`;
@@ -421,6 +476,17 @@ function render(){
         h+=`<div class="sess-date">${g.label}</div>`;
         h+=g.sessions.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
       });
+    } else if(period==='week'){
+      const byDate={};
+      filteredSess.forEach(s=>{
+        const dk=new Date(s.startedAt).toLocaleDateString('ja-JP');
+        if(!byDate[dk])byDate[dk]={label:fmtDate(s.startedAt),sessions:[]};
+        byDate[dk].sessions.push(s);
+      });
+      Object.values(byDate).forEach(g=>{
+        h+=`<div class="sess-date">${g.label}</div>`;
+        h+=g.sessions.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
+      });
     } else {
       h+=filteredSess.map(s=>{const c=getCat(s.categoryId);return`<div class="sess"><span style="font-size:16px">${c.emoji}</span><span class="sess-name">${esc(c.name)}</span><span class="sess-time">${fmtTime(s.startedAt)}</span><span class="sess-dur">${fmtDur(s.duration)}</span><button class="sess-del" onclick="delSess('${s.id}')">×</button></div>`;}).join('');
     }
@@ -433,6 +499,10 @@ ${cats.map(c=>`<div class="cat-item" style="border-left:3px solid ${col(c.color)
 <div class="add-row"><input id="ie" class="inp-e" placeholder="🍀" maxlength="2"><input id="in" class="inp-n" placeholder="カテゴリ名" maxlength="20"><button class="add-btn" onclick="addCat()">追加</button></div>
 <div class="sec-title zm">ノアへのエクスポート</div>
 <div class="export-card">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+<label style="font-size:13px;color:#888B7E;font-weight:700">出力日</label>
+<input type="date" value="${expDate}" onchange="setExpDate(this.value)" style="border:1px solid #E0DDD2;border-radius:10px;padding:7px 10px;font-size:14px;font-family:inherit;background:#F7F6EF;color:#30322D;flex:1">
+</div>
 <textarea class="exp-ta" readonly>${esc(buildExp())}</textarea>
 <button class="copy-btn" style="background:${copied?'#E5B65C':'#7FA889'}" onclick="copyExp()">${copied?'✅ コピーしました':'📋 コピーしてノアに渡す'}</button>
 </div>
@@ -458,7 +528,7 @@ ${cats.map(c=>`<div class="cat-item" style="border-left:3px solid ${col(c.color)
   await openDB();
   await migrate();
   sessions=await idbGetAll();
-  if(active)startTick();
+  if(actives.length)startTick();
   render();
 })();
 </script>
